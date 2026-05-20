@@ -1,0 +1,3270 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Tienda Eben-ezer — Control de Fiados v4</title>
+<meta name="description" content="Control de fiados - Tienda Eben-ezer">
+<meta name="theme-color" content="#1a1814">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Eben-ezer">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-apple.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@600;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script>
+  try {
+    var _fbCfg = {
+      apiKey: "AIzaSyAzOoK99y6L95sFAKZFZ0wY42Ljw2YEOM8",
+      authDomain: "globalacce-37997.firebaseapp.com",
+      projectId: "globalacce-37997",
+      storageBucket: "globalacce-37997.firebasestorage.app",
+      messagingSenderId: "779307465490",
+      appId: "1:779307465490:web:848a554272501bbaf251cb"
+    };
+    var _ebeApp = firebase.apps.find(function(a){ return a.name === 'ebeapp'; });
+    if (!_ebeApp) _ebeApp = firebase.initializeApp(_fbCfg, 'ebeapp');
+    window.__ebeDB = _ebeApp.firestore().collection("ebenezer").doc("main");
+    window.__ebeFirebaseOK = true;
+  } catch(e) {
+    window.__ebeFirebaseOK = false;
+    window.__ebeDB = null;
+    console.warn("Firebase Eben-ezer no disponible:", e);
+  }
+</script>
+<style>
+:root{
+  --bg:#f7f6f3;
+  --surface:#ffffff;
+  --surface2:#f2f0ec;
+  --surface3:#e8e5df;
+  --border:#dedad3;
+  --border2:#e8e5df;
+  --ink:#1a1814;
+  --ink2:#3d3a35;
+  --ink3:#7a756e;
+  --accent:#1c4f3c;
+  --accent2:#2d7a5f;
+  --accent-light:#e8f2ee;
+  --accent-warm:#c8a96e;
+  --accent-warm-light:#f5f0e8;
+  --red:#b83a2e;
+  --red-light:#fdf0ee;
+  --green:#1c4f3c;
+  --green-light:#e8f2ee;
+  --blue:#2251a3;
+  --blue-light:#eaf0fb;
+  --shadow:0 1px 3px rgba(26,24,20,.06),0 4px 16px rgba(26,24,20,.06);
+  --shadow-md:0 2px 8px rgba(26,24,20,.08),0 12px 40px rgba(26,24,20,.1);
+  --shadow-lg:0 8px 24px rgba(26,24,20,.1),0 32px 80px rgba(26,24,20,.12);
+  --font-head:'DM Sans',sans-serif;
+  --font-body:'Inter',sans-serif;
+  --r:10px;
+  --r-lg:14px;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+html{-webkit-font-smoothing:antialiased;}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-body);min-height:100vh;display:flex;flex-direction:column;}
+.sidebar{display:none!important;}
+.main{margin-left:0!important;padding:0;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+/* TOPBAR */
+.topbar{background:var(--ink);display:flex;align-items:center;justify-content:space-between;padding:0 20px;height:52px;flex-shrink:0;}
+.topbar-logo{display:flex;align-items:center;gap:10px;}
+.topbar-icon{font-size:20px;}
+.topbar-name{font-family:var(--font-head);font-size:16px;font-weight:800;color:#fff;letter-spacing:-.2px;}
+.topbar-sub{font-size:10.5px;color:rgba(255,255,255,.4);font-weight:400;margin-top:1px;}
+.topbar-actions{display:flex;gap:5px;align-items:center;}
+.topbar-btn{background:rgba(255,255,255,.08);color:rgba(255,255,255,.75);border:1px solid rgba(255,255,255,.12);border-radius:7px;padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer;font-family:var(--font-body);transition:all .15s;display:flex;align-items:center;gap:4px;}
+.topbar-btn:hover{background:rgba(255,255,255,.16);color:#fff;}
+
+/* STATUS BAR */
+.undo-bar{background:var(--surface2);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:6px;padding:4px 20px;flex-shrink:0;}
+.undo-bar-label{font-size:10.5px;color:var(--ink3);font-weight:500;margin-right:4px;}
+
+/* MAIN TABS */
+.main-tabs{background:var(--surface);border-bottom:1px solid var(--border);display:flex;padding:0 20px;flex-shrink:0;}
+.main-tab{padding:13px 18px;font-family:var(--font-head);font-size:12.5px;font-weight:700;cursor:pointer;color:var(--ink3);border:none;background:none;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .15s;letter-spacing:.3px;display:flex;align-items:center;gap:6px;}
+.main-tab:hover{color:var(--ink2);}
+.main-tab.active{color:var(--accent);border-bottom-color:var(--accent);}
+
+/* TAB PANEL */
+main.main{flex:1;padding:0;}
+.tab-panel{display:none;padding:22px 20px 36px;animation:fadeUp .2s ease;}
+.tab-panel.active{display:block;}
+
+/* PAGE HEADER */
+.page-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:10px;}
+.page-title{font-family:var(--font-head);font-size:22px;font-weight:800;color:var(--ink);letter-spacing:-.5px;}
+.page-title span{color:var(--accent);}
+.header-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:9px 15px;border-radius:var(--r);font-size:12.5px;font-weight:600;cursor:pointer;border:none;font-family:var(--font-body);transition:all .14s;white-space:nowrap;letter-spacing:.1px;}
+.btn-primary{background:var(--accent);color:#fff;}
+.btn-primary:hover{background:#163d2f;transform:translateY(-1px);box-shadow:0 4px 12px rgba(28,79,60,.25);}
+.btn-success{background:var(--accent);color:#fff;}
+.btn-success:hover{background:#163d2f;transform:translateY(-1px);}
+.btn-ghost{background:var(--surface);color:var(--ink2);border:1.5px solid var(--border);}
+.btn-ghost:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-light);}
+.btn-amber{background:var(--ink2);color:#fff;}
+.btn-amber:hover{background:var(--ink);transform:translateY(-1px);}
+.btn-danger{background:var(--red);color:#fff;}
+.btn-danger:hover{background:#9a2f25;transform:translateY(-1px);}
+.btn-warning{background:var(--accent-warm);color:#fff;}
+.btn-warning:hover{background:#b5944e;transform:translateY(-1px);}
+.btn-sm{padding:6px 12px;font-size:12px;}
+.btn-xs{padding:4px 9px;font-size:11px;border-radius:7px;}
+
+/* CARD */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:18px;box-shadow:var(--shadow);}
+
+/* STATS */
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:11px;margin-bottom:16px;}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:16px 18px;position:relative;overflow:hidden;box-shadow:var(--shadow);transition:transform .15s,box-shadow .15s;min-width:0;}
+.stat-card:hover{transform:translateY(-2px);box-shadow:var(--shadow-md);}
+.stat-card .bg-icon{position:absolute;right:12px;top:12px;font-size:28px;opacity:.07;}
+.stat-label{font-size:9.5px;color:var(--ink3);text-transform:uppercase;letter-spacing:1px;font-weight:700;margin-bottom:8px;}
+.stat-value{font-family:var(--font-head);font-size:22px;font-weight:800;letter-spacing:-.5px;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;display:block;}
+.stat-sub{font-size:11px;color:var(--ink3);margin-top:4px;}
+.s-blue .stat-value{color:var(--blue);}
+.s-red .stat-value{color:var(--red);}
+.s-green .stat-value{color:var(--accent);}
+.s-gray .stat-value{color:var(--ink2);}
+.s-blue{border-left:3px solid var(--blue);}
+.s-red{border-left:3px solid var(--red);}
+.s-green{border-left:3px solid var(--accent);}
+.s-gray{border-left:3px solid var(--border);}
+
+/* CHARTS */
+.charts-grid{display:grid;grid-template-columns:1.4fr 1fr;gap:11px;margin-bottom:16px;}
+.chart-title{font-family:var(--font-head);font-size:13.5px;font-weight:700;margin-bottom:13px;color:var(--ink);letter-spacing:-.2px;}
+
+/* TABLE */
+.table-wrap{overflow-x:auto;}
+table{width:100%;border-collapse:collapse;font-size:12.5px;}
+thead th{text-align:left;padding:9px 13px;font-size:9.5px;text-transform:uppercase;letter-spacing:.8px;color:var(--ink3);font-weight:700;border-bottom:1px solid var(--border);background:var(--surface2);}
+tbody tr{border-bottom:1px solid var(--border2);transition:background .1s;}
+tbody tr:hover{background:var(--surface2);}
+tbody td{padding:10px 13px;color:var(--ink2);}
+
+/* BADGES */
+.badge{display:inline-block;padding:2px 8px;border-radius:5px;font-size:10px;font-weight:700;letter-spacing:.2px;}
+.badge-red{background:var(--red-light);color:var(--red);}
+.badge-green{background:var(--green-light);color:var(--green);}
+.badge-amber{background:var(--accent-warm-light);color:#8a6b30;}
+.badge-orange{background:var(--blue-light);color:var(--blue);}
+.badge-blue{background:var(--blue-light);color:var(--blue);}
+.badge-abono{background:#fef9e7;color:#8a6b30;}
+
+/* AVATAR */
+.avatar{width:32px;height:32px;border-radius:7px;display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:11px;margin-right:8px;vertical-align:middle;font-family:var(--font-head);flex-shrink:0;}
+
+/* MODAL */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(26,24,20,.55);z-index:300;align-items:center;justify-content:center;backdrop-filter:blur(4px);padding:16px;}
+.modal-overlay.open{display:flex;}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:24px;width:520px;max-width:100%;max-height:92vh;overflow-y:auto;box-shadow:var(--shadow-lg);animation:fadeUp .18s ease;}
+.modal-wide{width:640px;}
+.modal-xl{width:780px;}
+.modal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid var(--border2);}
+.modal-title{font-family:var(--font-head);font-size:16px;font-weight:800;color:var(--ink);letter-spacing:-.3px;}
+.modal-close{background:var(--surface2);border:none;color:var(--ink3);width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:14px;transition:.15s;}
+.modal-close:hover{background:var(--border);color:var(--ink);}
+
+/* FORM */
+.form-group{margin-bottom:14px;}
+.form-label{display:block;font-size:10px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px;}
+.form-input,.form-select{width:100%;background:var(--bg);border:1.5px solid var(--border);border-radius:var(--r);padding:10px 12px;color:var(--ink);font-family:var(--font-body);font-size:13.5px;outline:none;transition:all .14s;}
+.form-input:focus,.form-select:focus{border-color:var(--accent);background:#fff;box-shadow:0 0 0 3px rgba(28,79,60,.1);}
+.form-select option{background:#fff;}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.form-row-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;}
+.form-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:20px;padding-top:16px;border-top:1px solid var(--border2);flex-wrap:wrap;}
+
+/* PRODUCT LIST */
+.product-list-modal{background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin:10px 0;max-height:220px;overflow-y:auto;}
+.pitem{display:flex;justify-content:space-between;align-items:center;padding:9px 12px;border-bottom:1px solid var(--border2);font-size:12.5px;gap:8px;}
+.pitem:last-child{border-bottom:none;}
+.pitem .info{flex:1;}
+.pitem .name{font-weight:600;color:var(--ink);}
+.pitem .meta{color:var(--ink3);font-size:10.5px;margin-top:2px;}
+.pitem .price{font-weight:700;color:var(--accent);white-space:nowrap;font-family:var(--font-head);}
+.pitem-remove{background:none;border:none;color:var(--ink3);cursor:pointer;font-size:12px;padding:3px 6px;border-radius:5px;transition:.13s;}
+.pitem-remove:hover{color:var(--red);background:var(--red-light);}
+
+/* TOTAL ROW */
+.total-row{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;background:var(--accent-light);border:1px solid rgba(28,79,60,.15);border-radius:var(--r);margin:10px 0;}
+.total-row .label{font-weight:600;font-size:13px;color:var(--ink2);}
+.total-row .amount{font-family:var(--font-head);font-size:21px;font-weight:800;color:var(--accent);}
+
+/* SEARCH */
+.search-wrap{position:relative;}
+.search-wrap .sicon{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--ink3);font-size:12px;}
+.search-input{background:var(--surface);border:1.5px solid var(--border);border-radius:var(--r);padding:8px 12px 8px 30px;color:var(--ink);font-family:var(--font-body);font-size:12.5px;outline:none;width:220px;transition:all .14s;}
+.search-input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(28,79,60,.08);}
+
+/* QUICK SEARCH */
+.quick-search-bar{display:flex;gap:10px;align-items:center;background:var(--surface);border:1.5px solid var(--border);border-radius:var(--r-lg);padding:11px 15px;margin-bottom:16px;box-shadow:var(--shadow);transition:all .15s;}
+.quick-search-bar:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px rgba(28,79,60,.08);}
+.quick-search-bar .qs-icon{font-size:17px;color:var(--ink3);}
+.quick-search-bar input{flex:1;border:none;background:transparent;font-size:14px;color:var(--ink);font-family:var(--font-body);outline:none;}
+.quick-search-bar input::placeholder{color:var(--ink3);}
+.qs-results{position:absolute;left:0;right:0;top:calc(100%+6px);background:var(--surface);border:1px solid var(--border);border-radius:var(--r);box-shadow:var(--shadow-md);z-index:500;max-height:280px;overflow-y:auto;}
+.qs-result-item{display:flex;align-items:center;gap:10px;padding:11px 13px;cursor:pointer;border-bottom:1px solid var(--border2);transition:background .1s;}
+.qs-result-item:last-child{border-bottom:none;}
+.qs-result-item:hover{background:var(--surface2);}
+.qs-result-name{font-weight:700;color:var(--ink);font-size:13px;}
+.qs-result-meta{font-size:11px;color:var(--ink3);margin-top:1px;}
+.qs-result-debt{font-weight:800;font-family:var(--font-head);font-size:14px;color:var(--accent);}
+.qs-wrap{position:relative;flex:1;}
+
+/* DEBT BAR */
+.debt-bar{height:3px;background:var(--border2);border-radius:3px;overflow:hidden;margin-top:5px;}
+.debt-bar-fill{height:100%;border-radius:3px;}
+
+/* CLIENT HEADER IN MODAL */
+.cmh{display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--surface2);border-radius:var(--r);margin-bottom:16px;border:1px solid var(--border);}
+.avatar-lg{width:44px;height:44px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;font-family:var(--font-head);flex-shrink:0;}
+.cmh-name{font-family:var(--font-head);font-size:15px;font-weight:800;color:var(--ink);}
+.cmh-meta{color:var(--ink3);font-size:11.5px;margin-top:2px;}
+
+/* MPS */
+.mps-list{background:var(--bg);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin:8px 0;}
+.mps-item{display:flex;align-items:center;justify-content:space-between;padding:9px 12px;border-bottom:1px solid var(--border2);font-size:12.5px;gap:8px;}
+.mps-item:last-child{border-bottom:none;}
+.mps-item-name{font-weight:600;color:var(--ink);flex:1;}
+.mps-item-qty{color:var(--ink3);font-size:11px;}
+.mps-item-price{font-weight:700;color:var(--accent);white-space:nowrap;font-family:var(--font-head);}
+.mps-empty{text-align:center;padding:14px;color:var(--ink3);font-size:12.5px;}
+.add-line-form{background:var(--surface2);border:1.5px dashed var(--border);border-radius:var(--r);padding:13px;margin:10px 0;}
+.add-line-title{font-size:10px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px;}
+.add-line-row{display:grid;grid-template-columns:2fr 1fr 1.2fr auto;gap:8px;align-items:end;}
+
+/* LIQ */
+.liq-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:11px;margin-bottom:16px;}
+.liq-filter-bar{display:flex;gap:10px;align-items:center;margin-bottom:13px;flex-wrap:wrap;}
+.liq-detalle-list{background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);padding:8px;margin-top:8px;max-height:180px;overflow-y:auto;}
+.liq-detalle-item{display:flex;justify-content:space-between;align-items:center;padding:6px 8px;border-bottom:1px solid var(--border2);font-size:12px;}
+.liq-detalle-item:last-child{border-bottom:none;}
+
+/* APF */
+.apf{background:var(--bg);border:1.5px dashed var(--border);border-radius:var(--r);padding:12px;margin:10px 0;}
+.apf-title{font-size:10px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px;}
+
+/* TOAST */
+.toast{position:fixed;bottom:20px;right:20px;padding:11px 16px;border-radius:var(--r);font-weight:600;font-size:12.5px;z-index:9999;font-family:var(--font-body);box-shadow:var(--shadow-md);animation:fadeUp .18s ease;display:flex;align-items:center;gap:8px;}
+.toast-success{background:var(--ink);color:#fff;}
+.toast-info{background:var(--blue);color:#fff;}
+
+.slabel{font-size:9.5px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.9px;margin-bottom:8px;}
+.empty-state{text-align:center;padding:36px 20px;color:var(--ink3);font-size:13px;}
+.divider{height:1px;background:var(--border2);margin:14px 0;}
+.section-title{font-family:var(--font-head);font-size:14px;font-weight:700;color:var(--ink);margin-bottom:12px;letter-spacing:-.2px;}
+
+/* PRINT */
+#print-area{display:none;}
+@media print{body>*:not(#print-area){display:none!important;}#print-area{display:block!important;padding:20px;}}
+
+/* EDIT LIQ */
+.edit-liq-row{display:flex;gap:6px;align-items:center;margin-bottom:6px;}
+
+/* NEQUI QR */
+.nequi-qr-box{background:var(--accent-light);border:1px solid rgba(28,79,60,.18);border-radius:var(--r);padding:14px;text-align:center;margin-top:10px;}
+
+/* SUB-NAV */
+.sub-nav{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:18px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:5px;}
+.sub-nav-item{padding:6px 11px;border-radius:7px;font-size:11.5px;font-weight:600;cursor:pointer;color:var(--ink3);transition:all .14s;}
+.sub-nav-item:hover{color:var(--ink2);background:var(--surface2);}
+.sub-nav-item.active{color:var(--accent);background:var(--accent-light);font-weight:700;}
+.sub-page{display:none;}
+.sub-page.active{display:block;animation:fadeUp .18s ease;}
+
+/* NOTEBOOK */
+.notebook-wrap{max-width:720px;margin:0 auto;width:100%;}
+.notebook{background:#fff;border-radius:var(--r-lg);box-shadow:var(--shadow-md);position:relative;overflow:visible;margin-bottom:22px;border:1px solid var(--border);}
+.notebook::before{content:'';position:absolute;left:50px;top:0;bottom:0;width:1px;background:rgba(200,169,110,.25);z-index:0;}
+.notebook-lines{position:absolute;inset:0;z-index:0;pointer-events:none;
+  background-image:repeating-linear-gradient(transparent,transparent 31px,rgba(200,169,110,.12) 31px,rgba(200,169,110,.12) 32px);
+  background-position:0 52px;}
+.notebook-header{background:var(--ink);padding:16px 14px 16px 62px;position:relative;z-index:1;border-radius:var(--r-lg) var(--r-lg) 0 0;}
+.notebook-header-title{font-family:var(--font-head);font-size:18px;font-weight:800;color:#fff;letter-spacing:-.2px;}
+.notebook-header-sub{font-size:11px;color:rgba(255,255,255,.45);margin-top:3px;}
+.notebook-body{padding:16px 14px 20px 62px;position:relative;z-index:1;overflow:visible;}
+.notebook-section{font-family:var(--font-head);font-size:13.5px;font-weight:700;color:var(--ink);margin:16px 0 11px;padding-bottom:6px;border-bottom:1px solid var(--border2);display:flex;align-items:center;gap:8px;letter-spacing:-.2px;}
+.notebook-section:first-child{margin-top:0;}
+.notebook-holes{position:absolute;left:0;top:0;bottom:0;width:50px;background:var(--surface2);display:flex;flex-direction:column;align-items:center;justify-content:space-around;padding:24px 0;z-index:1;border-right:1px solid var(--border);border-radius:var(--r-lg) 0 0 var(--r-lg);}
+.notebook-hole{width:15px;height:15px;border-radius:50%;background:#fff;border:1px solid var(--border);}
+
+/* CLI SEARCH */
+.cli-search-box{background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--r);padding:11px 13px;margin-bottom:13px;position:relative;overflow:visible;transition:all .15s;}
+.cli-search-box:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px rgba(28,79,60,.08);}
+.cli-search-box input{width:100%;border:none;background:transparent;font-size:14px;color:var(--ink);font-family:var(--font-body);outline:none;}
+.cli-search-box .search-icon{font-size:15px;margin-right:7px;vertical-align:middle;opacity:.45;}
+.cli-found-card{background:var(--accent-light);border:1px solid rgba(28,79,60,.18);border-radius:var(--r);padding:11px 13px;display:flex;align-items:center;gap:11px;margin-bottom:13px;}
+.cli-found-card .cfc-name{font-family:var(--font-head);font-size:14px;font-weight:800;color:var(--ink);}
+.cli-found-card .cfc-meta{font-size:11px;color:var(--ink3);margin-top:2px;}
+.cli-found-card .cfc-deuda{font-family:var(--font-head);font-size:17px;font-weight:800;color:var(--accent);margin-left:auto;}
+.cli-results-drop{position:absolute;left:0;right:0;top:calc(100%+4px);background:var(--surface);border:1px solid var(--border);border-radius:var(--r);box-shadow:var(--shadow-md);z-index:500;max-height:260px;overflow-y:auto;}
+
+/* REG MODE */
+.reg-mode-tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-bottom:16px;}
+.reg-mode-tab{padding:9px 6px;border-radius:var(--r);font-size:11.5px;font-weight:700;cursor:pointer;border:1.5px solid var(--border);background:var(--surface);color:var(--ink3);transition:all .14s;text-align:center;line-height:1.3;}
+.reg-mode-tab:hover:not(.active){background:var(--surface2);color:var(--ink2);}
+.reg-mode-tab.active{background:var(--ink);color:#fff;border-color:var(--ink);}
+.reg-mode-panel{display:none;}
+.reg-mode-panel.active{display:block;}
+
+/* FECHA */
+.fecha-grande{font-size:12px;font-weight:500;color:var(--ink3);text-align:right;margin-bottom:11px;letter-spacing:.2px;}
+
+/* RESPONSIVE */
+@media(max-width:520px){
+  .topbar{padding:0 12px;}
+  .topbar-name{font-size:14px;}
+  .topbar-sub{display:none;}
+  .topbar-btn{font-size:10px;padding:5px 8px;}
+  .topbar-btn:nth-child(n+3){display:none!important;}
+  .undo-bar-label{display:none;}
+  .main-tab{padding:11px 12px;font-size:12px;}
+  .tab-panel{padding:14px 12px 28px;}
+  .notebook-holes{width:36px;}
+  .notebook-header{padding:13px 10px 13px 44px;}
+  .notebook-body{padding:13px 10px 16px 44px;}
+  .notebook::before{left:36px;}
+  .add-line-row{grid-template-columns:1fr 1fr;gap:6px;}
+  .add-line-row>div:first-child{grid-column:1/-1;}
+  .form-row{grid-template-columns:1fr;}
+  .form-row-3{grid-template-columns:1fr 1fr;}
+  .stats-grid{grid-template-columns:1fr 1fr;}
+  .charts-grid{grid-template-columns:1fr;}
+  .sub-nav{padding:4px;gap:3px;}
+  .sub-nav-item{padding:5px 8px;font-size:11px;}
+  .page-header{flex-direction:column;align-items:flex-start;}
+  .reg-mode-tabs{grid-template-columns:1fr 1fr;gap:4px;}
+  .reg-mode-tab{font-size:11px;padding:8px 4px;}
+  .stat-card{padding:13px 14px;}
+  .stat-value{font-size:20px;}
+  .modal{border-radius:12px;padding:16px;}
+  main.main{padding:0;}
+}
+@media(max-width:360px){.topbar-btn{display:none!important;}#btn-instalar{display:none!important;}}
+input[type="month"].form-input{cursor:pointer;}
+</style>
+</head>
+<body>
+
+<div id="print-area"></div>
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <div class="topbar-logo">
+    <div class="topbar-icon">🏪</div>
+    <div>
+      <div class="topbar-name">Tienda Eben-ezer</div>
+      <div class="topbar-sub" id="topbar-deuda-total">Sistema de Fiados</div>
+    </div>
+  </div>
+  <div class="topbar-actions">
+    <button id="btn-instalar" onclick="instalarPWA()" class="topbar-btn" style="display:none;">📲 Instalar App</button>
+    <button class="topbar-btn" onclick="openModal('m-nequi-config')" title="Configurar Nequi/QR">📱 Nequi/QR</button>
+    <button class="topbar-btn" onclick="exportarHTML()">📲 Compartir App</button>
+    <button class="topbar-btn" onclick="exportarDatos()">💾 Respaldo</button>
+    <button class="topbar-btn" onclick="exportarExcel()">📊 Excel</button>
+  </div>
+</div>
+
+<!-- STATUS BAR -->
+<div class="undo-bar">
+  <span class="undo-bar-label" id="save-status">💾 Datos guardados</span>
+  <div style="flex:1"></div>
+  <button class="btn btn-ghost btn-xs" onclick="diagnosticarStorage()" title="Ver estado del almacenamiento">🔍 Estado</button>
+  <button class="btn btn-ghost btn-xs" onclick="document.getElementById('imp').click()">📂 Importar</button>
+  <input type="file" id="imp" accept=".json,.xlsx,.xls" style="display:none" onchange="importarDatos(event)">
+</div>
+
+<!-- MAIN TABS -->
+<div class="main-tabs">
+  <button class="main-tab active" id="mtab-registro" onclick="switchMainTab('registro')">📝 Registro</button>
+  <button class="main-tab" id="mtab-reportes" onclick="switchMainTab('reportes')">📊 Reportes</button>
+</div>
+
+<main class="main">
+
+<!-- ══════════════════════════════════ -->
+<!-- TAB: REGISTRO (CUADERNO) -->
+<!-- ══════════════════════════════════ -->
+<div id="tab-registro" class="tab-panel active">
+  <div class="notebook-wrap">
+
+    <!-- Fecha -->
+    <div class="fecha-grande" id="fecha-hoy-display"></div>
+
+    <!-- MODOS: Nuevo Cliente / Agregar a Cliente / Liquidar -->
+    <div class="reg-mode-tabs">
+      <div class="reg-mode-tab active" id="rmt-nuevo" onclick="switchRegMode('nuevo')">👤 Nuevo Cliente</div>
+      <div class="reg-mode-tab" id="rmt-agregar" onclick="switchRegMode('agregar')">➕ Agregar Productos</div>
+      <div class="reg-mode-tab" id="rmt-liquidar" onclick="switchRegMode('liquidar')">✅ Pagar</div>
+      <div class="reg-mode-tab" id="rmt-buscar" onclick="switchRegMode('buscar')">🔍 Buscar Cliente</div>
+    </div>
+
+    <!-- ── MODO: NUEVO CLIENTE ── -->
+    <div class="reg-mode-panel active" id="rmp-nuevo">
+      <div class="notebook">
+        <div class="notebook-holes"><div class="notebook-hole"></div><div class="notebook-hole"></div><div class="notebook-hole"></div><div class="notebook-hole"></div></div>
+        <div class="notebook-lines"></div>
+        <div class="notebook-header">
+          <div class="notebook-header-title">📋 Nuevo Cliente</div>
+          <div class="notebook-header-sub">Registra los datos del cliente y sus productos</div>
+        </div>
+        <div class="notebook-body">
+          <div class="notebook-section">👤 Datos del Cliente</div>
+          <div class="form-group"><label class="form-label">Nombre Completo *</label><input class="form-input" id="reg-nc-n" placeholder="Ej: María García"></div>
+          <div class="form-group"><label class="form-label">Teléfono</label><input class="form-input" id="reg-nc-t" placeholder="300 000 0000"></div>
+
+          <div class="notebook-section">📦 Productos</div>
+          <div class="add-line-form" style="margin-left:0;margin-right:0;">
+            <div class="add-line-title">➕ Agregar producto</div>
+            <div class="add-line-row">
+              <div class="form-group" style="margin:0;"><label class="form-label">Producto</label><input class="form-input" id="reg-nc-pnombre" placeholder="Nombre del producto" onkeydown="if(event.key==='Enter')document.getElementById('reg-nc-pq').focus()"></div>
+              <div class="form-group" style="margin:0;"><label class="form-label">Cantidad</label><input class="form-input" id="reg-nc-pq" type="number" min="1" value="1"></div>
+              <div class="form-group" style="margin:0;"><label class="form-label">Valor $</label><input class="form-input" id="reg-nc-pv" type="number" min="0" placeholder="0" onkeydown="if(event.key==='Enter')regNcAgregarProd()"></div>
+              <div><button class="btn btn-primary" onclick="regNcGuardarDirecto()" style="height:42px;margin-top:17px;white-space:nowrap;">💾 Guardar</button></div>
+            </div>
+          </div>
+          <div id="reg-nc-prod-list" style="display:none;">
+            <div class="slabel" style="margin-bottom:6px;">Productos a registrar</div>
+            <div class="mps-list" id="reg-nc-mps-list"></div>
+            <div class="total-row" id="reg-nc-total-row"><span class="label">Total inicial:</span><span class="amount" id="reg-nc-total-v">$0</span></div>
+          </div>
+          <div class="form-group" style="margin-top:12px;"><label class="form-label">Fecha</label><input class="form-input" id="reg-nc-fecha" type="date" style="max-width:200px;"></div>
+          <div class="form-actions" style="padding-top:14px;border-top:1px solid var(--border2);">
+            <button class="btn btn-ghost" onclick="regNcLimpiar()">🗑️ Limpiar</button>
+            <button class="btn btn-primary" onclick="regCrearCliente()">✓ Crear Cliente</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── MODO: AGREGAR PRODUCTOS A CLIENTE EXISTENTE ── -->
+    <div class="reg-mode-panel" id="rmp-agregar">
+      <div class="notebook">
+        <div class="notebook-holes"><div class="notebook-hole"></div><div class="notebook-hole"></div><div class="notebook-hole"></div><div class="notebook-hole"></div></div>
+        <div class="notebook-lines"></div>
+        <div class="notebook-header">
+          <div class="notebook-header-title">➕ Agregar</div>
+          <div class="notebook-header-sub">Busca el cliente y agrega lo que llevó hoy</div>
+        </div>
+        <div class="notebook-body">
+          <div class="notebook-section">🔍 Seleccionar Cliente</div>
+          <div class="cli-search-box" style="position:relative;">
+            <span class="search-icon">🔍</span>
+            <input id="reg-buscar-cliente" placeholder="Escribe el nombre o teléfono del cliente..." oninput="regBuscarCliente(this.value)" onkeydown="regBuscarKey(event,'agregar')" autocomplete="off">
+            <div class="cli-results-drop" id="reg-cli-results-agregar" style="display:none;"></div>
+          </div>
+          <div id="reg-cli-found-agregar" style="display:none;" class="cli-found-card">
+            <div class="avatar" id="reg-cli-av-agregar" style="font-size:13px;width:42px;height:42px;"></div>
+            <div><div class="cfc-name" id="reg-cli-name-agregar"></div><div class="cfc-meta" id="reg-cli-meta-agregar"></div></div>
+            <div class="cfc-deuda" id="reg-cli-deuda-agregar"></div>
+            <button class="btn btn-xs btn-ghost" onclick="regLimpiarClienteAgregar()">✕ Cambiar</button>
+          </div>
+
+          <div id="reg-agregar-form" style="display:none;">
+            <div class="notebook-section">📦 Productos a Agregar</div>
+
+            <!-- FILA DE ENTRADA -->
+            <div class="add-line-form" style="margin:0 0 10px;">
+              <div class="add-line-title">Ingresa cada producto y presiona <strong>➕ Añadir</strong> para acumularlo en la lista. Al terminar, presiona <strong>💾 Guardar Todos</strong>.</div>
+              <div class="add-line-row" style="grid-template-columns:2fr 1fr 1.2fr auto auto;">
+                <div class="form-group" style="margin:0;"><label class="form-label">Producto</label>
+                  <input class="form-input" id="reg-ag-np" placeholder="Nombre del producto"
+                    onkeydown="if(event.key==='Enter')document.getElementById('reg-ag-nq').focus()">
+                </div>
+                <div class="form-group" style="margin:0;"><label class="form-label">Cantidad</label>
+                  <input class="form-input" id="reg-ag-nq" type="number" min="1" value="1"
+                    oninput="regAgPrev()"
+                    onkeydown="if(event.key==='Enter')document.getElementById('reg-ag-nv').focus()">
+                </div>
+                <div class="form-group" style="margin:0;"><label class="form-label">Valor $</label>
+                  <input class="form-input" id="reg-ag-nv" type="number" min="0" placeholder="0"
+                    oninput="regAgPrev()"
+                    onkeydown="if(event.key==='Enter')regAgAnadirALista()">
+                </div>
+                <div style="margin-top:17px;">
+                  <button class="btn btn-primary" onclick="regAgAnadirALista()" style="height:42px;white-space:nowrap;" title="Añadir a la lista sin guardar aún">
+                    ➕ Añadir
+                  </button>
+                </div>
+                <div style="margin-top:17px;">
+                  <button class="btn btn-ghost" onclick="regAgGuardarDirecto()" style="height:42px;white-space:nowrap;" title="Guardar este solo producto directamente">
+                    💾 Directo
+                  </button>
+                </div>
+              </div>
+              <div id="reg-ag-prev" style="display:none;font-size:12.5px;color:var(--accent);font-weight:700;margin-top:6px;text-align:right;"></div>
+            </div>
+
+            <!-- LISTA ACUMULADA -->
+            <div id="reg-ag-list-wrap" style="display:none;">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+                <div class="slabel" id="reg-ag-list-label" style="margin:0;">Lista de productos a guardar</div>
+                <button class="btn btn-xs btn-ghost" onclick="regAgLimpiarLista()" style="color:var(--red);border-color:var(--red);">🗑️ Limpiar lista</button>
+              </div>
+              <div class="mps-list" id="reg-ag-list"></div>
+              <div class="total-row" id="reg-ag-total-row">
+                <span class="label">Total a registrar:</span>
+                <span class="amount" id="reg-ag-total-v">$0</span>
+              </div>
+            </div>
+
+            <div class="form-group" style="margin-top:12px;"><label class="form-label">Fecha</label><input class="form-input" id="reg-ag-fecha" type="date" style="max-width:200px;"></div>
+
+            <div class="form-actions">
+              <button class="btn btn-ghost" onclick="verDetalle(regAgClienteId)">👁️ Ver Cuenta</button>
+              <button class="btn btn-ghost" onclick="enviarWhatsApp(regAgClienteId,'deuda')" id="reg-ag-wa-btn">💬 WhatsApp</button>
+              <button class="btn btn-success" onclick="liquidar(regAgClienteId)" id="reg-ag-liq-btn">✓ Pagar</button>
+              <button class="btn btn-primary" id="reg-ag-save-btn" onclick="regAgGuardar()">💾 Guardar Todos</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── MODO: LIQUIDAR CUENTA ── -->
+    <div class="reg-mode-panel" id="rmp-liquidar">
+      <div class="notebook">
+        <div class="notebook-holes"><div class="notebook-hole"></div><div class="notebook-hole"></div><div class="notebook-hole"></div><div class="notebook-hole"></div></div>
+        <div class="notebook-lines"></div>
+        <div class="notebook-header">
+          <div class="notebook-header-title">✅ Liquidar</div>
+          <div class="notebook-header-sub">Cobra y cierra la deuda de un cliente</div>
+        </div>
+        <div class="notebook-body">
+          <div class="notebook-section">🔍 Seleccionar Cliente</div>
+          <div class="cli-search-box" style="position:relative;">
+            <span class="search-icon">🔍</span>
+            <input id="reg-buscar-liq" placeholder="Escribe el nombre o teléfono del cliente..." oninput="regBuscarClienteLiq(this.value)" onkeydown="regBuscarKey(event,'liquidar')" autocomplete="off">
+            <div class="cli-results-drop" id="reg-cli-results-liq" style="display:none;"></div>
+          </div>
+          <div id="reg-liq-detalle" style="display:none;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── MODO: BUSCAR CLIENTE ── -->
+    <div class="reg-mode-panel" id="rmp-buscar">
+      <div class="notebook">
+        <div class="notebook-holes"><div class="notebook-hole"></div><div class="notebook-hole"></div><div class="notebook-hole"></div><div class="notebook-hole"></div></div>
+        <div class="notebook-lines"></div>
+        <div class="notebook-header">
+          <div class="notebook-header-title">🔍 Buscar</div>
+          <div class="notebook-header-sub">Consulta la deuda y cuenta de cualquier cliente</div>
+        </div>
+        <div class="notebook-body">
+          <div class="cli-search-box" style="position:relative;">
+            <span class="search-icon">🔍</span>
+            <input id="reg-buscar-general" placeholder="Nombre o teléfono..." oninput="regBuscarGeneral(this.value)" autocomplete="off">
+            <div class="cli-results-drop" id="reg-cli-results-general" style="display:none;"></div>
+          </div>
+          <div id="reg-general-result" style="margin-top:12px;"></div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /notebook-wrap -->
+</div><!-- /tab-registro -->
+
+<!-- ══════════════════════════════════ -->
+<!-- TAB: REPORTES -->
+<!-- ══════════════════════════════════ -->
+<div id="tab-reportes" class="tab-panel">
+  <!-- Sub-nav de reportes -->
+  <div class="sub-nav">
+    <div class="sub-nav-item active" id="snav-dashboard" onclick="switchSubPage('dashboard')">📊 Dashboard</div>
+    <div class="sub-nav-item" id="snav-clientes" onclick="switchSubPage('clientes')">👥 Clientes</div>
+    <div class="sub-nav-item" id="snav-historial" onclick="switchSubPage('historial')">📋 Historial</div>
+    <div class="sub-nav-item" id="snav-liquidaciones" onclick="switchSubPage('liquidaciones')">✅ Liquidaciones</div>
+    <div class="sub-nav-item" id="snav-productos-dia" onclick="switchSubPage('productos-dia')">📆 Por Día</div>
+  </div>
+
+  <!-- DASHBOARD -->
+  <div class="sub-page active" id="sub-dashboard">
+    <div class="page-header">
+      <div class="page-title">Panel de <span>Control</span></div>
+      <div class="header-actions">
+        <button class="btn btn-ghost btn-sm" onclick="exportarExcel()">📊 Excel</button>
+        <button class="btn btn-ghost btn-sm" onclick="exportarDatos()">💾 Respaldo</button>
+      </div>
+    </div>
+    <div style="position:relative;">
+      <div class="quick-search-bar">
+        <span class="qs-icon">🔍</span>
+        <div class="qs-wrap">
+          <input id="qs-input" placeholder="Buscar cliente... (nombre o teléfono)" oninput="busquedaRapida(this.value)" onkeydown="qsKey(event)">
+          <div class="qs-results" id="qs-results" style="display:none;"></div>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="qsVerDetalle()" id="qs-btn-ver" style="display:none">👁️ Ver Deuda</button>
+      </div>
+    </div>
+    <div class="stats-grid" id="stats-grid"></div>
+    <div class="charts-grid">
+      <div class="card"><div class="chart-title">📦 Deuda por Cliente</div><canvas id="chart-bar" height="180"></canvas></div>
+      <div class="card"><div class="chart-title">🥧 Distribución Total</div><canvas id="chart-doughnut" height="180"></canvas></div>
+    </div>
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:13px">
+        <div class="chart-title" style="margin:0">🏆 Ranking de Deudores</div>
+        <button class="btn btn-ghost btn-sm" onclick="switchSubPage('clientes')">Ver todos →</button>
+      </div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Cliente</th><th>Teléfono</th><th>Deuda</th><th>Último Mov.</th><th>Estado</th><th>Acciones</th></tr></thead>
+        <tbody id="top-table"></tbody>
+      </table></div>
+    </div>
+  </div>
+
+  <!-- CLIENTES -->
+  <div class="sub-page" id="sub-clientes">
+    <div class="page-header">
+      <div class="page-title">Mis <span>Clientes</span></div>
+      <div class="header-actions">
+        <div class="search-wrap"><span class="sicon">🔍</span><input class="search-input" placeholder="Buscar..." oninput="filtrar(this.value)"></div>
+        <select class="form-select" id="cli-estado-filter" style="width:160px;" onchange="filtrar(document.querySelector('.search-input').value)">
+          <option value="todos">Todos</option>
+          <option value="deudores">Solo deudores</option>
+          <option value="al-dia">Al día</option>
+        </select>
+        <button class="btn btn-primary" onclick="openNuevoCliente()">＋ Nuevo Cliente</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="table-wrap"><table>
+        <thead><tr><th>Cliente</th><th>Teléfono</th><th>Deuda</th><th>Ítems</th><th>Estado</th><th>Acciones</th></tr></thead>
+        <tbody id="cli-table"></tbody>
+      </table></div>
+    </div>
+  </div>
+
+  <!-- HISTORIAL -->
+  <div class="sub-page" id="sub-historial">
+    <div class="page-header">
+      <div class="page-title">Historial de <span>Movimientos</span></div>
+    </div>
+    <div class="card">
+      <div style="display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap;">
+        <div class="search-wrap" style="flex:1;min-width:180px;"><span class="sicon">🔍</span><input class="search-input" style="width:100%;" id="hist-search" placeholder="Buscar por cliente o producto..." oninput="renderHist()"></div>
+        <select class="form-select" id="hist-filter" style="width:160px;" onchange="renderHist()">
+          <option value="todos">Todos los estados</option>
+          <option value="pendiente">Pendientes</option>
+          <option value="pagado">Pagados</option>
+        </select>
+        <select class="form-select" id="hist-cliente-filter" style="width:180px;" onchange="renderHist()">
+          <option value="">Todos los clientes</option>
+        </select>
+      </div>
+      <div id="hist-resumen" style="display:none;background:var(--accent-light);border:1px solid rgba(37,99,168,.2);border-radius:8px;padding:11px 15px;margin-bottom:12px;font-size:13px;color:var(--text2);"></div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Fecha</th><th>Cliente</th><th>Producto / Cuenta</th><th>Cant.</th><th>Val. Unit.</th><th>Total</th><th>Tipo</th><th>Estado</th></tr></thead>
+        <tbody id="hist-table"></tbody>
+      </table></div>
+    </div>
+  </div>
+
+  <!-- LIQUIDACIONES -->
+  <div class="sub-page" id="sub-liquidaciones">
+    <div class="page-header">
+      <div class="page-title">Historial de <span>Liquidaciones</span></div>
+      <button class="btn btn-ghost btn-sm" onclick="exportarLiquidacionesExcel()">📊 Exportar Liquidaciones</button>
+    </div>
+    <div class="liq-stats">
+      <div class="stat-card s-green"><div class="bg-icon">✅</div><div class="stat-label">Total Liquidado</div><div class="stat-value" id="liq-total-val">$0</div><div class="stat-sub" id="liq-total-sub">0 pagos</div></div>
+      <div class="stat-card s-gray"><div class="bg-icon">📅</div><div class="stat-label">Este Mes</div><div class="stat-value" id="liq-mes-val">$0</div><div class="stat-sub" id="liq-mes-sub">0 pagos</div></div>
+      <div class="stat-card s-blue"><div class="bg-icon">👥</div><div class="stat-label">Clientes al Día</div><div class="stat-value" id="liq-cli-val">0</div><div class="stat-sub">sin deuda activa</div></div>
+    </div>
+    <div class="card">
+      <div class="liq-filter-bar">
+        <div class="search-wrap" style="flex:1;min-width:180px;"><span class="sicon">🔍</span><input class="search-input" style="width:100%;" id="liq-search" placeholder="Buscar cliente..." oninput="renderLiq()"></div>
+        <select class="form-select" id="liq-mes-filter" style="width:170px;" onchange="renderLiq()"><option value="">Todos los meses</option></select>
+      </div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Fecha Liquidación</th><th>Cliente</th><th>Productos Pagados</th><th>Valor Liquidado</th><th>Detalle</th><th>Acciones</th></tr></thead>
+        <tbody id="liq-table"></tbody>
+      </table></div>
+    </div>
+  </div>
+
+  <!-- PRODUCTOS POR DÍA -->
+  <div class="sub-page" id="sub-productos-dia">
+    <div class="page-header">
+      <div class="page-title">Productos <span>por Día</span></div>
+      <div class="header-actions">
+        <input type="month" class="form-input" id="pd-mes-filter" style="width:180px;" onchange="renderProdDia()">
+      </div>
+    </div>
+    <div class="stats-grid" style="grid-template-columns:repeat(3,1fr);" id="pd-stats"></div>
+    <div class="card" id="pd-card">
+      <div id="pd-content"><div class="empty-state">Cargando...</div></div>
+    </div>
+  </div>
+
+</div><!-- /tab-reportes -->
+
+</main>
+
+<!-- ============ MODALES ============ -->
+
+<!-- NUEVO CLIENTE (con productos) -->
+<div class="modal-overlay" id="m-nc">
+  <div class="modal modal-xl">
+    <div class="modal-header"><div class="modal-title">👤 Nuevo Cliente</div><button class="modal-close" onclick="closeModal('m-nc')">✕</button></div>
+    <div class="form-group"><label class="form-label">Nombre Completo *</label><input class="form-input" id="nc-n" placeholder="Ej: María García"></div>
+    <div class="form-group"><label class="form-label">Teléfono</label><input class="form-input" id="nc-t" placeholder="300 000 0000"></div>
+    <div class="divider"></div>
+    <div class="slabel">Productos iniciales (opcional)</div>
+    <div class="add-line-form">
+      <div class="add-line-title">➕ Agregar producto</div>
+      <div class="add-line-row">
+        <div class="form-group" style="margin:0;"><label class="form-label">Producto</label><input class="form-input" id="nc-pnombre" placeholder="Nombre del producto" onkeydown="if(event.key==='Enter')document.getElementById('nc-pq').focus()"></div>
+        <div class="form-group" style="margin:0;"><label class="form-label">Cantidad</label><input class="form-input" id="nc-pq" type="number" min="1" value="1"></div>
+        <div class="form-group" style="margin:0;"><label class="form-label">Valor $</label><input class="form-input" id="nc-pv" type="number" min="0" placeholder="0" onkeydown="if(event.key==='Enter')ncAgregarProdGuardar()"></div>
+        <div><button class="btn btn-primary" onclick="ncAgregarProdGuardar()" style="height:42px;margin-top:17px;white-space:nowrap;">💾 Guardar</button></div>
+      </div>
+    </div>
+    <div id="nc-prod-list" style="display:none;">
+      <div class="slabel" style="margin-bottom:6px;">Lista de productos</div>
+      <div class="mps-list" id="nc-mps-list"></div>
+      <div class="total-row" id="nc-total-row"><span class="label">Total inicial:</span><span class="amount" id="nc-total-v">$0</span></div>
+    </div>
+    <div class="form-group" style="margin-top:10px;"><label class="form-label">Fecha</label><input class="form-input" id="nc-fecha" type="date" style="max-width:200px;"></div>
+    <div class="form-actions">
+      <button class="btn btn-ghost" onclick="closeModal('m-nc')">Cancelar</button>
+      <button class="btn btn-primary" onclick="crearCliente()">✓ Crear Cliente</button>
+    </div>
+  </div>
+</div>
+
+<!-- NUEVO MOVIMIENTO GENERAL -->
+<div class="modal-overlay" id="m-mv">
+  <div class="modal">
+    <div class="modal-header"><div class="modal-title">📦 Registrar Producto</div><button class="modal-close" onclick="closeModal('m-mv')">✕</button></div>
+    <div class="form-group"><label class="form-label">Cliente *</label><select class="form-select" id="mv-c"></select></div>
+    <div class="form-group"><label class="form-label">Producto *</label><input class="form-input" id="mv-p" placeholder="Nombre del producto"></div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Cantidad</label><input class="form-input" id="mv-q" type="number" min="1" value="1" oninput="prevMv()"></div>
+      <div class="form-group"><label class="form-label">Valor Unitario ($) *</label><input class="form-input" id="mv-v" type="number" min="0" placeholder="0" oninput="prevMv()"></div>
+    </div>
+    <div class="form-group"><label class="form-label">Fecha</label><input class="form-input" id="mv-f" type="date"></div>
+    <div id="mv-prev" style="display:none" class="total-row"><span class="label">Subtotal:</span><span class="amount" id="mv-prev-v">$0</span></div>
+    <div class="form-actions">
+      <button class="btn btn-ghost" onclick="closeModal('m-mv')">Cancelar</button>
+      <button class="btn btn-primary" onclick="crearMov()">✓ Registrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- DETALLE / AGREGAR / LIQUIDAR (unificado) -->
+<div class="modal-overlay" id="m-det">
+  <div class="modal modal-xl">
+    <div class="modal-header"><div class="modal-title" id="det-title">Detalle</div><button class="modal-close" onclick="closeModal('m-det')">✕</button></div>
+    <div id="det-body"></div>
+  </div>
+</div>
+
+<!-- DETALLE LIQUIDACION -->
+<div class="modal-overlay" id="m-liq-det">
+  <div class="modal modal-wide">
+    <div class="modal-header"><div class="modal-title" id="liq-det-title">Detalle de Liquidación</div><button class="modal-close" onclick="closeModal('m-liq-det')">✕</button></div>
+    <div id="liq-det-body"></div>
+  </div>
+</div>
+
+<!-- EDITAR LIQUIDACION -->
+<div class="modal-overlay" id="m-liq-edit">
+  <div class="modal modal-wide">
+    <div class="modal-header"><div class="modal-title">✏️ Editar Liquidación</div><button class="modal-close" onclick="closeModal('m-liq-edit')">✕</button></div>
+    <div id="liq-edit-body"></div>
+  </div>
+</div>
+
+<!-- ALERTA COPIA DE SEGURIDAD -->
+<div class="modal-overlay" id="m-backup-alert">
+  <div class="modal" style="max-width:420px;text-align:center;">
+    <div style="font-size:52px;margin-bottom:10px;">💾</div>
+    <div class="modal-title" style="font-size:20px;margin-bottom:10px;">¡Hora de hacer una copia de seguridad!</div>
+    <p style="color:var(--text2);font-size:14px;line-height:1.6;margin-bottom:6px;">
+      Han pasado <strong>3 días</strong> desde tu último respaldo. Te recomendamos exportar tus datos para no perder información importante.
+    </p>
+    <p style="color:var(--muted);font-size:12px;margin-bottom:20px;">Puedes exportar con el botón de arriba a la derecha → <strong>Respaldo</strong> o <strong>Compartir App</strong>.</p>
+    <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
+      <button class="btn btn-primary" onclick="hacerRespaltoAhora()">💾 Exportar Respaldo Ahora</button>
+      <button class="btn btn-ghost" onclick="posponer3Dias()">⏰ Recordarme en 3 días</button>
+    </div>
+    <div style="margin-top:12px;">
+      <button style="background:none;border:none;color:var(--muted);font-size:12px;cursor:pointer;text-decoration:underline;" onclick="cerrarAlertaBackup()">Cerrar sin recordar</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- EDITAR CLIENTE -->
+<div class="modal-overlay" id="m-edit-cli">
+  <div class="modal">
+    <div class="modal-header"><div class="modal-title">✏️ Editar Cliente</div><button class="modal-close" onclick="closeModal('m-edit-cli')">✕</button></div>
+    <div class="form-group"><label class="form-label">Nombre Completo *</label><input class="form-input" id="ec-nombre" placeholder="Nombre completo"></div>
+    <div class="form-group"><label class="form-label">Teléfono</label><input class="form-input" id="ec-tel" placeholder="300 000 0000"></div>
+    <div class="form-actions">
+      <button class="btn btn-ghost" onclick="closeModal('m-edit-cli')">Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarEditCliente()">✓ Guardar Cambios</button>
+    </div>
+  </div>
+</div>
+
+<!-- ABONO A DEUDA INDIVIDUAL -->
+<div class="modal-overlay" id="m-abono-deuda">
+  <div class="modal">
+    <div class="modal-header"><div class="modal-title">💳 Abonar a Deuda</div><button class="modal-close" onclick="closeModal('m-abono-deuda')">✕</button></div>
+    <div id="abono-deuda-body"></div>
+  </div>
+</div>
+
+<!-- CONFIRMAR PAGO TOTAL -->
+<div class="modal-overlay" id="m-confirm-pago">
+  <div class="modal" style="max-width:420px;">
+    <div class="modal-header">
+      <div class="modal-title">✅ Confirmar Pago Total</div>
+      <button class="modal-close" onclick="closeModal('m-confirm-pago')">✕</button>
+    </div>
+    <div id="confirm-pago-body"></div>
+  </div>
+</div>
+
+<!-- EDITAR PRODUCTO ADEUDADO -->
+<div class="modal-overlay" id="m-editar-producto">
+  <div class="modal" style="max-width:460px;">
+    <div class="modal-header">
+      <div class="modal-title">✏️ Editar Producto</div>
+      <button class="modal-close" onclick="closeModal('m-editar-producto')">✕</button>
+    </div>
+    <div id="ep-body"></div>
+  </div>
+</div>
+
+<!-- CONFIRMAR ABONO PARCIAL -->
+<div class="modal-overlay" id="m-confirm-abono">
+  <div class="modal" style="max-width:420px;">
+    <div class="modal-header">
+      <div class="modal-title">💰 Confirmar Abono Parcial</div>
+      <button class="modal-close" onclick="closeModal('m-confirm-abono')">✕</button>
+    </div>
+    <div id="confirm-abono-body"></div>
+  </div>
+</div>
+
+<!-- CONFIGURAR NEQUI/QR -->
+<div class="modal-overlay" id="m-nequi-config">
+  <div class="modal">
+    <div class="modal-header"><div class="modal-title">📱 Configurar Nequi / QR de Pago</div><button class="modal-close" onclick="closeModal('m-nequi-config')">✕</button></div>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:14px;">Este número aparecerá en los comprobantes y mensajes de WhatsApp que envíes a tus clientes.</p>
+    <div class="form-group"><label class="form-label">Número Nequi</label><input class="form-input" id="nequi-num" placeholder="Ej: 310 555 1234" type="tel"></div>
+    <div class="form-group"><label class="form-label">Nombre de la cuenta</label><input class="form-input" id="nequi-nombre" placeholder="Tienda Eben-ezer"></div>
+    <div class="form-group">
+      <label class="form-label">QR de Pago (imagen opcional)</label>
+      <input type="file" accept="image/*" onchange="cargarQRNequi(event)" style="display:block;margin-top:6px;font-size:13px;">
+      <div id="nequi-preview" style="display:none;margin-top:10px;" class="nequi-qr-box">
+        <img id="nequi-qr-img" src="" style="max-width:180px;max-height:180px;border-radius:8px;display:block;margin:0 auto;">
+        <div style="font-size:11px;color:var(--text2);margin-top:6px;">Vista previa del QR</div>
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-ghost" onclick="closeModal('m-nequi-config')">Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarNequiConfig()">✓ Guardar Configuración</button>
+    </div>
+  </div>
+</div>
+
+
+<script>
+// ═══════════════════════════════════════════
+// DB + PERSISTENCIA + HISTORIAL UNDO/REDO
+// ═══════════════════════════════════════════
+let db={clientes:[],movimientos:[],liquidaciones:[],nci:1,nmi:1,nli:1};
+
+// Historial: pila de estados para deshacer/rehacer
+let historial=[];
+let historialIdx=-1;
+const MAX_HIST=50;
+
+function snapshot(desc=''){
+  // Al hacer un cambio nuevo, eliminamos todo lo que estaba "adelante"
+  if(historialIdx<historial.length-1){
+    historial=historial.slice(0,historialIdx+1);
+  }
+  historial.push({estado:JSON.stringify(db),desc:desc||'Cambio',ts:Date.now()});
+  if(historial.length>MAX_HIST)historial.shift();
+  historialIdx=historial.length-1;
+  _saveHistorial();
+}
+
+function undo(){
+  if(historialIdx<=0){toast('⚠️ No hay más cambios anteriores','info');return;}
+  historialIdx--;
+  db=JSON.parse(historial[historialIdx].estado);
+  _migrateDb();
+  localStorage.setItem('te4_db',JSON.stringify(db));
+  _saveHistorial();
+  refreshAll();
+  let desc=historial[historialIdx+1]?.desc||'';
+  toast(`↩️ Deshecho: ${desc}`);
+}
+
+function redo(){
+  if(historialIdx>=historial.length-1){toast('⚠️ No hay más cambios por rehacer','info');return;}
+  historialIdx++;
+  db=JSON.parse(historial[historialIdx].estado);
+  _migrateDb();
+  localStorage.setItem('te4_db',JSON.stringify(db));
+  _saveHistorial();
+  refreshAll();
+  let desc=historial[historialIdx]?.desc||'';
+  toast(`↪️ Rehecho: ${desc}`);
+}
+
+function _updateUndoRedoBtns(){
+  let btnU=document.getElementById('btn-undo');
+  let btnR=document.getElementById('btn-redo');
+  if(btnU){
+    btnU.disabled=historialIdx<=0;
+    btnU.style.opacity=historialIdx<=0?'0.4':'1';
+    let prev=historialIdx>0?historial[historialIdx-1]?.desc:'';
+    btnU.title=historialIdx>0?`Deshacer: ${historial[historialIdx].desc}`:'Sin cambios anteriores';
+  }
+  if(btnR){
+    btnR.disabled=historialIdx>=historial.length-1;
+    btnR.style.opacity=historialIdx>=historial.length-1?'0.4':'1';
+    btnR.title=historialIdx<historial.length-1?`Rehacer: ${historial[historialIdx+1]?.desc}`:'Sin cambios por rehacer';
+  }
+}
+
+function _saveHistorial(){
+  try{localStorage.setItem('te4_hist',JSON.stringify({historial,historialIdx}));}catch(e){}
+}
+
+function _loadHistorial(){
+  try{
+    let h=localStorage.getItem('te4_hist');
+    if(h){let p=JSON.parse(h);historial=p.historial||[];historialIdx=p.historialIdx??-1;}
+  }catch(e){}
+}
+
+function _migrateDb(){
+  if(!db.liquidaciones)db.liquidaciones=[];
+  if(!db.nli)db.nli=1;
+  db.liquidaciones.forEach(l=>{if(!l.detalle)l.detalle=[];});
+}
+
+function save(desc=''){
+  try{
+    snapshot(desc);
+    const payload=JSON.stringify(db);
+    localStorage.setItem('te4_db',payload);
+    localStorage.setItem('te4_db_ts',Date.now().toString());
+    // Guardar en Firebase (nube automática)
+    if(window.__ebeFirebaseOK && window.__ebeDB){
+      window.__ebeDB.set({
+        appData: payload,
+        updatedAt: new Date().toISOString()
+      }).catch(function(e){ console.warn('Error Firebase Eben-ezer:', e); });
+    }
+    // Indicador visual de guardado
+    let el=document.getElementById('save-status');
+    if(el){
+      el.textContent='✅ Guardado';
+      el.style.color='var(--accent)';
+      clearTimeout(el._t);
+      el._t=setTimeout(()=>{el.textContent='💾 Datos guardados';el.style.color='';},1800);
+    }
+    _updateTopbarDeuda();
+  }catch(e){
+    let el=document.getElementById('save-status');
+    if(el){el.textContent='⚠️ Error al guardar';el.style.color='var(--red)';}
+    console.error('Error guardando:',e);
+  }
+}
+function _updateTopbarDeuda(){
+  let td=db.clientes.reduce((s,c)=>s+deuda(c.id),0);
+  let el=document.getElementById('topbar-deuda-total');
+  if(el && td>0) el.textContent='💰 Total en fiados: '+fmt(td);
+  else if(el) el.textContent='Sistema de Fiados';
+}
+// Cargar datos frescos desde Firebase (asíncrono)
+function _loadFromFirebase(){
+  if(!window.__ebeFirebaseOK || !window.__ebeDB) return;
+  window.__ebeDB.get().then(function(doc){
+    if(doc.exists && doc.data().appData){
+      try{
+        const fbData = JSON.parse(doc.data().appData);
+        const fbTs = doc.data().updatedAt ? new Date(doc.data().updatedAt).getTime() : 0;
+        const localTs = parseInt(localStorage.getItem('te4_db_ts')||'0');
+        // Solo actualizar si Firebase tiene datos más recientes
+        if(fbTs > localTs && fbData && Array.isArray(fbData.clientes)){
+          db = fbData;
+          _migrateDb();
+          localStorage.setItem('te4_db', JSON.stringify(fbData));
+          localStorage.setItem('te4_db_ts', fbTs.toString());
+          refreshAll();
+          console.log('✅ Datos actualizados desde Firebase');
+        }
+      }catch(e){ console.warn('Error procesando Firebase:', e); }
+    } else if(!doc.exists) {
+      // Primera vez: subir datos locales a Firebase
+      save('Primera sincronización con Firebase');
+    }
+  }).catch(function(e){ console.warn('Error leyendo Firebase:', e); });
+}
+
+function load(){
+  _loadHistorial();
+  // 1. Intentar localStorage con clave principal
+  try{
+    let r=localStorage.getItem('te4_db');
+    let ts=localStorage.getItem('te4_db_ts');
+    if(r){
+      let parsed=JSON.parse(r);
+      if(parsed && Array.isArray(parsed.clientes)){
+        db=parsed;
+        _migrateDb();
+        console.log('[DB] Cargado desde localStorage — ts:',ts?new Date(parseInt(ts)).toLocaleString():'—',`(${db.clientes.length} clientes, ${db.movimientos.length} movs)`);
+        // Cargar datos frescos de Firebase en segundo plano
+        _loadFromFirebase();
+        return true;
+      }
+    }
+  }catch(e){console.warn('[DB] Error leyendo te4_db:',e);}
+  // 2. Intentar claves antiguas
+  try{
+    let keys=['te4_hist','tc3_db','tc2_db'];
+    for(let k of keys){
+      if(k==='te4_hist') continue;
+      let r2=localStorage.getItem(k);
+      if(r2){
+        let old=JSON.parse(r2);
+        if(old && Array.isArray(old.clientes)){
+          db.clientes=old.clientes||[];
+          db.movimientos=old.movimientos||[];
+          db.nci=old.nci||db.clientes.length+1;
+          db.nmi=old.nmi||db.movimientos.length+1;
+          db.liquidaciones=(old.liquidaciones||[]).map(l=>({...l,detalle:l.detalle||[]}));
+          db.nli=old.nli||1;
+          _migrateDb();
+          save('Migración de datos');
+          console.log('[DB] Migrado desde',k);
+          return true;
+        }
+      }
+    }
+  }catch(e){console.warn('[DB] Error en migración:',e);}
+  // 3. No hay datos — se llamará seed()
+  console.log('[DB] Sin datos previos — iniciando con datos de ejemplo');
+  return false;
+}
+
+// ═══════════════════════════════════════════
+// SEED
+// ═══════════════════════════════════════════
+function seed(){
+  const CC=['#2563a8','#1a7a4a','#6b4c9a','#4a7fb5','#2980b9','#c0392b','#16a085'];
+  const CL=[{nombre:'María García',telefono:'310 555 1234',direccion:'Calle 10 # 5-20'},
+    {nombre:'Juan Pérez',telefono:'311 222 4567',direccion:'Carrera 7 # 12-3'},
+    {nombre:'Lucía Martínez',telefono:'315 888 9000',direccion:'Av. 15 # 8-90'},
+    {nombre:'Carlos Ruiz',telefono:'318 444 7777',direccion:'Calle 22 # 1-15'},
+    {nombre:'Ana Torres',telefono:'314 666 3210',direccion:'Carrera 3 # 5-6'}];
+  const PR=['Arroz 5kg','Aceite 1L','Azúcar 2kg','Café 500g','Leche 1L','Panela 1kg','Sal 1kg','Harina 2kg','Jabón x3','Pasta x2','Atún x2','Frijoles 1kg'];
+  CL.forEach((c,i)=>db.clientes.push({id:db.nci++,...c,color:CC[i%CC.length]}));
+  let now=new Date();
+  db.clientes.forEach(c=>{
+    let n=3+Math.floor(Math.random()*5);
+    for(let i=0;i<n;i++){
+      let d=new Date(now);d.setDate(d.getDate()-Math.floor(Math.random()*60));
+      db.movimientos.push({id:db.nmi++,clienteId:c.id,producto:PR[Math.floor(Math.random()*PR.length)],cantidad:1+Math.floor(Math.random()*4),valorUnit:(1+Math.floor(Math.random()*15))*2000,fecha:d.toISOString().split('T')[0],pagado:false,tipo:'individual'});
+    }
+  });
+  save('Estado inicial');
+}
+
+// ═══════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════
+const fmt=n=>'$'+Number(n).toLocaleString('es-CO');
+const ini=n=>n.split(' ').slice(0,2).map(w=>w[0]).join('').toUpperCase();
+const deuda=id=>db.movimientos.filter(m=>m.clienteId===id&&!m.pagado).reduce((s,m)=>s+m.valorUnit*m.cantidad,0);
+const activos=id=>db.movimientos.filter(m=>m.clienteId===id&&!m.pagado).sort((a,b)=>new Date(a.fecha)-new Date(b.fecha));
+const ulti=id=>{let ms=db.movimientos.filter(m=>m.clienteId===id);return ms.length?ms.sort((a,b)=>new Date(b.fecha)-new Date(a.fecha))[0].fecha:'—';}
+const today=()=>new Date().toISOString().split('T')[0];
+const nowDateTime=()=>{let n=new Date();let pad=x=>String(x).padStart(2,'0');return n.getFullYear()+'-'+pad(n.getMonth()+1)+'-'+pad(n.getDate())+'T'+pad(n.getHours())+':'+pad(n.getMinutes());};
+const fmtFechaHora=v=>{if(!v)return'—';if(v.includes('T')){let[fd,ft]=v.split('T');let[y,mo,d]=fd.split('-');return d+'/'+mo+'/'+y+' '+ft;}let[y,mo,d]=v.split('-');return d+'/'+mo+'/'+y;};
+const fmtFechaSolo=v=>{if(!v)return'—';let f=v.includes('T')?v.split('T')[0]:v;let[y,mo,d]=f.split('-');return d+'/'+mo+'/'+y;};
+const ultimoPago=id=>{let ls=db.liquidaciones.filter(l=>l.clienteId===id);if(!ls.length)return null;ls.sort((a,b)=>new Date(b.fecha)-new Date(a.fecha));return ls[0].fecha;};
+function curPage(){
+  // Si estamos en el tab de reportes, retornar la sub-página activa
+  let tabReportes=document.getElementById('tab-reportes');
+  if(tabReportes&&tabReportes.classList.contains('active')) return _curSubPage||'dashboard';
+  // En registro no hay sub-página de reportes que renderizar
+  return '__registro__';
+}
+
+// ═══════════════════════════════════════════
+// NAV
+// ═══════════════════════════════════════════
+function showPage(p){
+  document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.nav-item[id^="nav-"]').forEach(x=>x.classList.remove('active'));
+  document.getElementById('page-'+p).classList.add('active');
+  let ni=document.getElementById('nav-'+p);if(ni)ni.classList.add('active');
+  render(p);
+}
+function render(p){
+  // Actualizar siempre la barra superior (deuda total)
+  _updateTopbarDeuda();
+  // Si no hay página de reporte activa (estamos en Registro), no renderizar tabla
+  if(p==='__registro__') return;
+  if(p==='dashboard')renderDash();
+  else if(p==='clientes')renderCli();
+  else if(p==='historial')renderHist();
+  else if(p==='liquidaciones')renderLiq();
+  else if(p==='productos-dia')renderProdDia();
+}
+
+// Refresca todo: tabla activa + modales abiertos + paneles de registro
+function refreshAll(){
+  _updateTopbarDeuda();
+  let tabRep=document.getElementById('tab-reportes');
+  if(tabRep&&tabRep.classList.contains('active')) renderSubPage(_curSubPage||'dashboard');
+  // Refrescar panel Registro - liquidar si está visible
+  let regLiq=document.getElementById('reg-liq-detalle');
+  if(regLiq&&regLiq.style.display!=='none'&&_regLiqClienteId) regMostrarLiqDetalle(_regLiqClienteId);
+  // Refrescar panel Registro - agregar si cliente seleccionado
+  if(regAgClienteId){
+    let dEl=document.getElementById('reg-cli-deuda-agregar');
+    if(dEl) dEl.textContent=fmt(deuda(regAgClienteId));
+  }
+}
+
+// ═══════════════════════════════════════════
+// BÚSQUEDA RÁPIDA DASHBOARD — al hacer clic abre detalle
+// ═══════════════════════════════════════════
+let qsSelectedId=null;
+function busquedaRapida(v){
+  let res=document.getElementById('qs-results');
+  let btnVer=document.getElementById('qs-btn-ver');
+  if(!v||v.length<2){res.style.display='none';btnVer.style.display='none';qsSelectedId=null;return;}
+  let matches=db.clientes.filter(c=>c.nombre.toLowerCase().includes(v.toLowerCase())||c.telefono.includes(v));
+  if(!matches.length){res.innerHTML=`<div class="qs-result-item" style="color:var(--muted);">Sin resultados para "${v}"</div>`;res.style.display='block';return;}
+  res.innerHTML=matches.map(c=>{
+    let d=deuda(c.id);
+    return`<div class="qs-result-item" onclick="qsSeleccionar(${c.id})">
+      <div class="avatar" style="background:${c.color}22;color:${c.color};font-size:10px;margin:0;flex-shrink:0">${ini(c.nombre)}</div>
+      <div style="flex:1"><div class="qs-result-name">${c.nombre}</div><div class="qs-result-meta">📞 ${c.telefono} &nbsp;·&nbsp; ${activos(c.id).length} ítem${activos(c.id).length!==1?'s':''} pendientes</div></div>
+      <div class="qs-result-debt" style="color:${d>0?'var(--accent)':'var(--green)'}">${fmt(d)}</div>
+    </div>`;
+  }).join('');
+  res.style.display='block';
+}
+function qsSeleccionar(id){
+  let c=db.clientes.find(x=>x.id===id);
+  if(!c)return;
+  qsSelectedId=id;
+  document.getElementById('qs-input').value=c.nombre;
+  document.getElementById('qs-results').style.display='none';
+  document.getElementById('qs-btn-ver').style.display='inline-flex';
+  // Abrir directamente la pantalla de deuda
+  verDetalle(id);
+}
+function qsVerDetalle(){if(qsSelectedId)verDetalle(qsSelectedId);}
+function qsKey(e){
+  if(e.key==='Escape'){document.getElementById('qs-results').style.display='none';}
+  if(e.key==='Enter'&&qsSelectedId){verDetalle(qsSelectedId);}
+}
+document.addEventListener('click',function(e){
+  if(!e.target.closest('.quick-search-bar'))document.getElementById('qs-results').style.display='none';
+});
+
+// ═══════════════════════════════════════════
+// CHARTS
+// ═══════════════════════════════════════════
+let barC,dghC;
+function renderCharts(){
+  let sorted=db.clientes.slice().sort((a,b)=>deuda(b.id)-deuda(a.id)).slice(0,8);
+  let labels=sorted.map(c=>c.nombre.split(' ')[0]);
+  let vals=sorted.map(c=>deuda(c.id));
+  let cols=sorted.map(c=>c.color+'bb');
+  let borders=sorted.map(c=>c.color);
+  if(barC)barC.destroy();
+  barC=new Chart(document.getElementById('chart-bar'),{type:'bar',data:{labels,datasets:[{data:vals,backgroundColor:cols,borderColor:borders,borderWidth:1.5,borderRadius:7,borderSkipped:false}]},options:{responsive:true,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>fmt(ctx.raw)}}},scales:{x:{grid:{color:'rgba(0,0,0,.04)'},ticks:{color:'#7a96b5',font:{family:'Plus Jakarta Sans',size:11}}},y:{grid:{color:'rgba(0,0,0,.04)'},ticks:{color:'#7a96b5',callback:v=>fmt(v),font:{family:'Plus Jakarta Sans',size:11}}}}}});
+  if(dghC)dghC.destroy();
+  dghC=new Chart(document.getElementById('chart-doughnut'),{type:'doughnut',data:{labels,datasets:[{data:vals,backgroundColor:cols,borderColor:'#fff',borderWidth:3}]},options:{responsive:true,cutout:'62%',plugins:{legend:{position:'right',labels:{color:'#3b5a82',font:{family:'Plus Jakarta Sans',size:11},padding:9,boxWidth:11,boxHeight:11}},tooltip:{callbacks:{label:ctx=>ctx.label+': '+fmt(ctx.raw)}}}}});
+}
+
+// ═══════════════════════════════════════════
+// DASHBOARD
+// ═══════════════════════════════════════════
+function renderDash(){
+  let td=db.clientes.reduce((s,c)=>s+deuda(c.id),0);
+  let cd=db.clientes.filter(c=>deuda(c.id)>0).length;
+  let top=db.clientes.slice().sort((a,b)=>deuda(b.id)-deuda(a.id))[0];
+  let pend=db.movimientos.filter(m=>!m.pagado).length;
+  document.getElementById('stats-grid').innerHTML=`
+    <div class="stat-card s-blue"><div class="bg-icon">💰</div><div class="stat-label">Deuda Total</div><div class="stat-value">${fmt(td)}</div><div class="stat-sub">${cd} clientes con saldo</div></div>
+    <div class="stat-card s-red"><div class="bg-icon">⚠️</div><div class="stat-label">Mayor Deudor</div><div class="stat-value" style="font-size:14px;padding-top:6px;" title="${top?top.nombre:'—'}">${top?top.nombre:'—'}</div><div class="stat-sub" style="font-weight:700;color:var(--red)">${top?fmt(deuda(top.id)):''}</div></div>
+    <div class="stat-card s-green"><div class="bg-icon">👥</div><div class="stat-label">Total Clientes</div><div class="stat-value">${db.clientes.length}</div><div class="stat-sub">registrados</div></div>
+    <div class="stat-card s-gray"><div class="bg-icon">📦</div><div class="stat-label">Ítems Pendientes</div><div class="stat-value">${pend}</div><div class="stat-sub">sin pagar</div></div>`;
+  renderCharts();
+  let rows=db.clientes.slice().sort((a,b)=>deuda(b.id)-deuda(a.id)).map(c=>{
+    let d=deuda(c.id);
+    return`<tr>
+      <td><span class="avatar" style="background:${c.color}22;color:${c.color}">${ini(c.nombre)}</span><strong>${c.nombre}</strong></td>
+      <td>${c.telefono}</td>
+      <td style="font-weight:700;color:${d>0?'var(--accent)':'var(--green)'}">${fmt(d)}</td>
+      <td style="color:var(--muted)">${ulti(c.id)}</td>
+      <td><span class="badge ${d>0?'badge-red':'badge-green'}">${d>0?'Debe':'Al día'}</span></td>
+      <td style="display:flex;gap:4px;flex-wrap:wrap">
+        <button class="btn btn-xs btn-amber" onclick="verDetalle(${c.id})">👁️ Ver</button>
+        ${d>0?`<button class="btn btn-xs btn-success" onclick="liquidar(${c.id})">✓ Liquidar</button>`:''}
+        <button class="btn btn-xs btn-ghost" onclick="editarCliente(${c.id})" title="Editar">✏️</button>
+        <button class="btn btn-xs btn-danger" onclick="eliminarCliente(${c.id})" title="Eliminar">🗑️</button>
+      </td></tr>`;}).join('');
+  document.getElementById('top-table').innerHTML=rows||`<tr><td colspan="6"><div class="empty-state">Sin datos</div></td></tr>`;
+}
+
+// ═══════════════════════════════════════════
+// CLIENTES
+// ═══════════════════════════════════════════
+function renderCli(f='',estado='todos'){
+  let lista=db.clientes.filter(c=>{
+    let matchText=!f||c.nombre.toLowerCase().includes(f.toLowerCase())||c.telefono.includes(f);
+    let d=deuda(c.id);
+    let matchEstado=estado==='todos'||(estado==='deudores'&&d>0)||(estado==='al-dia'&&d===0);
+    return matchText&&matchEstado;
+  });
+  let maxD=Math.max(...db.clientes.map(c=>deuda(c.id)),1);
+  let rows=lista.map(c=>{
+    let d=deuda(c.id),pct=Math.round(d/maxD*100),mv=activos(c.id).length;
+    return`<tr>
+      <td><span class="avatar" style="background:${c.color}22;color:${c.color}">${ini(c.nombre)}</span><strong>${c.nombre}</strong></td>
+      <td>${c.telefono}</td>
+      <td><div style="font-weight:700;color:${d>0?'var(--accent)':'var(--green)'}">${fmt(d)}</div><div class="debt-bar"><div class="debt-bar-fill" style="width:${pct}%;background:${c.color}"></div></div></td>
+      <td><span class="badge badge-amber">${mv} ítem${mv!==1?'s':''}</span></td>
+      <td><span class="badge ${d>0?'badge-red':'badge-green'}">${d>0?'Debe':'Al día'}</span></td>
+      <td style="display:flex;gap:4px;flex-wrap:wrap">
+        <button class="btn btn-xs btn-amber" onclick="verDetalle(${c.id})">👁️ Ver Deuda</button>
+        ${d>0?`<button class="btn btn-xs btn-success" onclick="liquidar(${c.id})">✓ Liquidar</button>`:''}
+        <button class="btn btn-xs btn-ghost" onclick="editarCliente(${c.id})" title="Editar cliente">✏️ Editar</button>
+        <button class="btn btn-xs btn-danger" onclick="eliminarCliente(${c.id})" title="Eliminar cliente">🗑️</button>
+      </td></tr>`;}).join('');
+  document.getElementById('cli-table').innerHTML=rows||`<tr><td colspan="7"><div class="empty-state">No encontrado</div></td></tr>`;
+}
+function filtrar(v){
+  let estado=document.getElementById('cli-estado-filter')?.value||'todos';
+  renderCli(v||document.querySelector('#sub-clientes .search-input')?.value||'', estado);
+}
+
+// ═══════════════════════════════════════════
+// ELIMINAR CLIENTE
+// ═══════════════════════════════════════════
+// eliminarCliente definida más abajo
+
+// ═══════════════════════════════════════════
+// PRODUCTOS POR DÍA
+// ═══════════════════════════════════════════
+function renderProdDia(){
+  let mesInput=document.getElementById('pd-mes-filter');
+  let mesVal=mesInput.value;
+  // Filter movimientos by month
+  let movs=db.movimientos.filter(m=>{
+    if(!mesVal)return true;
+    return m.fecha.startsWith(mesVal);
+  });
+  // Group by date
+  let byDay={};
+  movs.forEach(m=>{
+    if(!byDay[m.fecha])byDay[m.fecha]=[];
+    byDay[m.fecha].push(m);
+  });
+  let dias=Object.keys(byDay).sort().reverse();
+  // Stats — Valor pendiente son solo los no pagados para coincidir con dashboard
+  let totalItems=movs.length;
+  let movsPend=movs.filter(m=>!m.pagado);
+  let totalPendiente=movsPend.reduce((s,m)=>s+m.valorUnit*m.cantidad,0);
+  let totalBruto=movs.reduce((s,m)=>s+m.valorUnit*m.cantidad,0);
+  let diasActivos=dias.length;
+  document.getElementById('pd-stats').innerHTML=`
+    <div class="stat-card s-blue"><div class="bg-icon">📦</div><div class="stat-label">Total Productos</div><div class="stat-value">${totalItems}</div><div class="stat-sub">${movsPend.length} pendientes de pago</div></div>
+    <div class="stat-card s-gray"><div class="bg-icon">📅</div><div class="stat-label">Días con Actividad</div><div class="stat-value">${diasActivos}</div><div class="stat-sub">días con movimientos</div></div>
+    <div class="stat-card s-red"><div class="bg-icon">💰</div><div class="stat-label">Deuda Pendiente</div><div class="stat-value" style="font-size:19px;padding-top:4px">${fmt(totalPendiente)}</div><div class="stat-sub">Total registrado: ${fmt(totalBruto)}</div></div>`;
+  if(!dias.length){
+    document.getElementById('pd-content').innerHTML=`<div class="empty-state">Sin productos registrados${mesVal?' para este mes':''}</div>`;
+    return;
+  }
+  let html=dias.map(fecha=>{
+    let items=byDay[fecha];
+    let total=items.reduce((s,m)=>s+m.valorUnit*m.cantidad,0);
+    let fechaFmt=new Date(fecha+'T12:00:00').toLocaleDateString('es-CO',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
+    let rows=items.map(m=>{
+      let c=db.clientes.find(x=>x.id===m.clienteId);
+      return`<tr>
+        <td>${c?`<span class="avatar" style="background:${c.color}22;color:${c.color};font-size:10px">${ini(c.nombre)}</span>${c.nombre}`:'—'}</td>
+        <td><strong>${m.producto}</strong></td>
+        <td style="color:var(--muted)">${m.cantidad}</td>
+        <td style="color:var(--muted)">${fmt(m.valorUnit)}</td>
+        <td style="font-weight:700;color:var(--accent)">${fmt(m.valorUnit*m.cantidad)}</td>
+        <td><span class="badge ${m.pagado?'badge-green':'badge-red'}">${m.pagado?'✓ Pagado':'Pendiente'}</span></td>
+      </tr>`;
+    }).join('');
+    return`<div style="margin-bottom:18px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+        <div style="font-family:var(--font-head);font-size:16px;font-weight:700;color:var(--text);text-transform:capitalize;">${fechaFmt}</div>
+        <div style="font-weight:700;color:var(--accent);font-family:var(--font-head);font-size:15px;">${fmt(total)} &nbsp;<span style="font-size:11px;color:var(--muted);font-family:var(--font-body);font-weight:400">${items.length} producto${items.length!==1?'s':''}</span></div>
+      </div>
+      <div class="table-wrap" style="border:1px solid var(--border2);border-radius:10px;overflow:hidden;">
+        <table>
+          <thead><tr><th>Cliente</th><th>Producto</th><th>Cant.</th><th>Val. Unit.</th><th>Total</th><th>Estado</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </div>`;
+  }).join('<div class="divider"></div>');
+  document.getElementById('pd-content').innerHTML=html;
+}
+
+// ═══════════════════════════════════════════
+// HISTORIAL
+// ═══════════════════════════════════════════
+function renderHist(){
+  let cliSel=document.getElementById('hist-cliente-filter');
+  let curVal=cliSel.value;
+  cliSel.innerHTML='<option value="">Todos los clientes</option>'+db.clientes.map(c=>`<option value="${c.id}">${c.nombre}</option>`).join('');
+  cliSel.value=curVal;
+  let busq=(document.getElementById('hist-search')?.value||'').toLowerCase();
+  let filtroEst=document.getElementById('hist-filter')?.value||'todos';
+  let filtroCli=document.getElementById('hist-cliente-filter')?.value||'';
+  let movs=[...db.movimientos].sort((a,b)=>new Date(b.fecha)-new Date(a.fecha));
+  if(filtroCli)movs=movs.filter(m=>m.clienteId===parseInt(filtroCli));
+  if(filtroEst==='pendiente')movs=movs.filter(m=>!m.pagado);
+  else if(filtroEst==='pagado')movs=movs.filter(m=>m.pagado);
+  if(busq){movs=movs.filter(m=>{let c=db.clientes.find(x=>x.id===m.clienteId);return(c&&c.nombre.toLowerCase().includes(busq))||m.producto.toLowerCase().includes(busq);});}
+  let resDiv=document.getElementById('hist-resumen');
+  if(filtroCli||busq){
+    let cliRes=filtroCli?db.clientes.find(x=>x.id===parseInt(filtroCli)):null;
+    let totalMovs=movs.reduce((s,m)=>s+m.valorUnit*m.cantidad,0);
+    let pendMovs=movs.filter(m=>!m.pagado).reduce((s,m)=>s+m.valorUnit*m.cantidad,0);
+    resDiv.style.display='block';
+    resDiv.innerHTML=`<strong>${cliRes?cliRes.nombre:'Resultados filtrados'}</strong> — ${movs.length} movimiento${movs.length!==1?'s':''} &nbsp;·&nbsp; Total: <strong style="color:var(--accent)">${fmt(totalMovs)}</strong> &nbsp;·&nbsp; Pendiente: <strong style="color:var(--red)">${fmt(pendMovs)}</strong>`;
+  } else {resDiv.style.display='none';}
+  let rows=movs.map(m=>{
+    let c=db.clientes.find(x=>x.id===m.clienteId);
+    let esCuenta=m.tipo==='cuenta';
+    return`<tr>
+      <td style="color:var(--muted)">${fmtFechaHora(m.fecha)}</td>
+      <td>${c?`<span class="avatar" style="background:${c.color}22;color:${c.color};font-size:10px">${ini(c.nombre)}</span>${c.nombre}`:'—'}</td>
+      <td><strong>${m.producto}</strong></td>
+      <td style="color:var(--muted)">${m.cantidad}</td>
+      <td style="color:var(--muted)">${fmt(m.valorUnit)}</td>
+      <td style="font-weight:700;color:var(--accent)">${fmt(m.valorUnit*m.cantidad)}</td>
+      <td><span class="badge ${esCuenta?'badge-blue':'badge-orange'}">${esCuenta?'📋 Cuenta':'📦 Individual'}</span></td>
+      <td><span class="badge ${m.pagado?'badge-green':'badge-red'}">${m.pagado?'✓ Pagado':'Pendiente'}</span></td></tr>`;
+  }).join('');
+  document.getElementById('hist-table').innerHTML=rows||`<tr><td colspan="8"><div class="empty-state">Sin movimientos para este filtro</div></td></tr>`;
+}
+
+// ═══════════════════════════════════════════
+// LIQUIDACIONES — con detalle, eliminar y editar
+// ═══════════════════════════════════════════
+function renderLiq(){
+  let totalLiq=db.liquidaciones.reduce((s,l)=>s+l.valor,0);
+  let mesActual=new Date().toISOString().slice(0,7);
+  let liqMes=db.liquidaciones.filter(l=>l.fecha.startsWith(mesActual));
+  let totalMes=liqMes.reduce((s,l)=>s+l.valor,0);
+  let cliAlDia=db.clientes.filter(c=>deuda(c.id)===0).length;
+  document.getElementById('liq-total-val').textContent=fmt(totalLiq);
+  document.getElementById('liq-total-sub').textContent=db.liquidaciones.length+' pago'+(db.liquidaciones.length!==1?'s':'');
+  document.getElementById('liq-mes-val').textContent=fmt(totalMes);
+  document.getElementById('liq-mes-sub').textContent=liqMes.length+' pago'+(liqMes.length!==1?'s':'')+' este mes';
+  document.getElementById('liq-cli-val').textContent=cliAlDia;
+  let meses=[...new Set(db.liquidaciones.map(l=>l.fecha.slice(0,7)))].sort().reverse();
+  let mSel=document.getElementById('liq-mes-filter');
+  let curMes=mSel.value;
+  mSel.innerHTML='<option value="">Todos los meses</option>'+meses.map(m=>{
+    let d=new Date(m+'-01');return`<option value="${m}">${d.toLocaleDateString('es-CO',{month:'long',year:'numeric'})}</option>`;
+  }).join('');
+  mSel.value=curMes;
+  let busq=(document.getElementById('liq-search')?.value||'').toLowerCase();
+  let filtroMes=document.getElementById('liq-mes-filter')?.value||'';
+  let liqs=[...db.liquidaciones].sort((a,b)=>new Date(b.fecha)-new Date(a.fecha));
+  if(filtroMes)liqs=liqs.filter(l=>l.fecha.startsWith(filtroMes));
+  if(busq)liqs=liqs.filter(l=>{let c=db.clientes.find(x=>x.id===l.clienteId);return c&&c.nombre.toLowerCase().includes(busq);});
+
+  let rows=liqs.map(l=>{
+    let c=db.clientes.find(x=>x.id===l.clienteId);
+    let fechaBase=l.fecha.includes('T')?l.fecha:l.fecha+'T12:00:00';let fecha=new Date(fechaBase).toLocaleDateString('es-CO',{day:'2-digit',month:'short',year:'numeric'})+(l.fecha.includes('T')?' '+l.fecha.split('T')[1].slice(0,5):'');
+    let det=l.detalle&&l.detalle.length?l.detalle:[];
+    let resumenDet=det.length?det.slice(0,2).map(p=>`<span style="font-size:11px;background:var(--accent-light);color:var(--accent);border-radius:4px;padding:2px 6px;margin:1px;display:inline-block;">${p.producto}</span>`).join('')+(det.length>2?`<span style="font-size:11px;color:var(--muted)"> +${det.length-2} más</span>`:''): `<span style="color:var(--muted);font-size:12px">${l.productos} producto${l.productos!==1?'s':''}</span>`;
+    return`<tr>
+      <td style="color:var(--muted);font-weight:600">${fecha}</td>
+      <td>${c?`<span class="avatar" style="background:${c.color}22;color:${c.color};font-size:10px">${ini(c.nombre)}</span><strong>${c.nombre}</strong>`:'—'}</td>
+      <td>${resumenDet}</td>
+      <td style="font-weight:800;font-family:var(--font-head);font-size:15px;color:var(--green)">${fmt(l.valor)}<br><span class="badge ${l.tipo==='abono'?'badge-abono':'badge-green'}" style="font-size:10px;">${l.tipo==='abono'?'Abono':'Pago Total'}</span></td>
+      <td>
+        <button class="btn btn-xs btn-ghost" onclick="verDetalleLiq(${l.id})">🔍 Ver qué pagó</button>
+      </td>
+      <td style="display:flex;gap:4px;">
+        <button class="btn btn-xs btn-warning" onclick="editarLiq(${l.id})">✏️ Editar</button>
+        <button class="btn btn-xs btn-danger" onclick="eliminarLiq(${l.id})">🗑️ Eliminar</button>
+      </td></tr>`;
+  }).join('');
+  document.getElementById('liq-table').innerHTML=rows||`<tr><td colspan="6"><div class="empty-state">No hay liquidaciones registradas aún</div></td></tr>`;
+}
+
+// Ver detalle de lo que se pagó en una liquidación
+function verDetalleLiq(id){
+  let l=db.liquidaciones.find(x=>x.id===id);
+  if(!l)return;
+  let c=db.clientes.find(x=>x.id===l.clienteId);
+  let fecha=new Date(l.fecha+'T12:00:00').toLocaleDateString('es-CO',{day:'2-digit',month:'long',year:'numeric'});
+  let det=l.detalle&&l.detalle.length?l.detalle:[];
+  document.getElementById('liq-det-title').textContent=`💳 Liquidación — ${c?c.nombre:'Cliente'}`;
+  let detHtml=det.length
+    ?`<div class="liq-detalle-list">${det.map((p,i)=>`
+      <div class="liq-detalle-item">
+        <div style="flex:1"><strong>${p.producto}</strong><span style="color:var(--muted);font-size:11px;margin-left:8px">${p.fecha}</span></div>
+        <div style="color:var(--muted);font-size:12px;margin-right:10px">×${p.cantidad} · ${fmt(p.valorUnit)} c/u</div>
+        <div style="font-weight:700;color:var(--accent)">${fmt(p.valorUnit*p.cantidad)}</div>
+      </div>`).join('')}</div>`
+    :`<div style="color:var(--muted);text-align:center;padding:20px;font-size:13px">No hay detalle disponible para esta liquidación (registro antiguo)</div>`;
+  document.getElementById('liq-det-body').innerHTML=`
+    <div class="cmh" style="margin-bottom:14px">
+      ${c?`<div class="avatar-lg" style="background:${c.color}22;color:${c.color}">${ini(c.nombre)}</div><div><div class="cmh-name">${c.nombre}</div><div class="cmh-meta">📅 ${fecha}</div></div>`:''}
+    </div>
+    <div class="slabel">Productos pagados (${det.length||l.productos})</div>
+    ${detHtml}
+    <div class="total-row" style="margin-top:12px"><span class="label">✅ Total Liquidado</span><span class="amount" style="color:var(--green)">${fmt(l.valor)}</span></div>
+    <div class="form-actions"><button class="btn btn-ghost" onclick="closeModal('m-liq-det')">Cerrar</button></div>`;
+  openModal('m-liq-det');
+}
+
+// Eliminar liquidación
+function eliminarLiq(id){
+  let l=db.liquidaciones.find(x=>x.id===id);
+  let c=db.clientes.find(x=>x.id===l?.clienteId);
+  if(!confirm(`¿Eliminar la liquidación de ${c?c.nombre:'este cliente'} por ${fmt(l.valor)}?\n\nEsta acción no restaura los movimientos pagados.`))return;
+  db.liquidaciones=db.liquidaciones.filter(x=>x.id!==id);
+  save("Eliminar liquidación");renderLiq();
+  toast('🗑️ Liquidación eliminada');
+}
+
+// Editar liquidación
+function editarLiq(id){
+  let l=db.liquidaciones.find(x=>x.id===id);
+  if(!l)return;
+  let c=db.clientes.find(x=>x.id===l.clienteId);
+  document.getElementById('liq-edit-body').innerHTML=`
+    <div class="form-group"><label class="form-label">Cliente</label><input class="form-input" value="${c?c.nombre:'—'}" disabled></div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Fecha de Liquidación</label><input class="form-input" id="le-fecha" type="date" value="${l.fecha}"></div>
+      <div class="form-group"><label class="form-label">Valor Liquidado ($)</label><input class="form-input" id="le-valor" type="number" value="${l.valor}" min="0"></div>
+    </div>
+    <div class="form-group"><label class="form-label">Notas (opcional)</label><input class="form-input" id="le-notas" value="${l.notas||''}" placeholder="Observaciones..."></div>
+    <div class="form-actions">
+      <button class="btn btn-ghost" onclick="closeModal('m-liq-edit')">Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarEditLiq(${id})">✓ Guardar Cambios</button>
+    </div>`;
+  openModal('m-liq-edit');
+}
+
+function guardarEditLiq(id){
+  let l=db.liquidaciones.find(x=>x.id===id);
+  if(!l)return;
+  let fecha=document.getElementById('le-fecha').value;
+  let valor=parseFloat(document.getElementById('le-valor').value)||l.valor;
+  let notas=(document.getElementById('le-notas').value||'').trim();
+  l.fecha=fecha||l.fecha;
+  l.valor=valor;
+  l.notas=notas;
+  save("Editar liquidación");closeModal("m-liq-edit");renderLiq();
+  toast('✓ Liquidación actualizada');
+}
+
+// ═══════════════════════════════════════════
+// VER DETALLE + AGREGAR (unificado)
+// ═══════════════════════════════════════════
+let detItems=[];
+let detClienteId=null;
+
+function verDetalle(id){
+  detItems=[];
+  detClienteId=id;
+  _renderDetalle();
+  openModal('m-det');
+  setTimeout(()=>document.getElementById('det-np')?.focus(),200);
+}
+
+function _renderDetalle(){
+  let id=detClienteId;
+  let c=db.clientes.find(x=>x.id===id);
+  let movs=activos(id);
+  let totalExist=deuda(id);
+  let totalNuevo=detItems.reduce((s,x)=>s+x.q*x.v,0);
+  let totalFinal=totalExist+totalNuevo;
+  // Historial de abonos/pagos del cliente
+  let abonosCliente=db.liquidaciones.filter(l=>l.clienteId===id).sort((a,b)=>new Date(b.fecha)-new Date(a.fecha));
+  let abonosHtml='';
+  if(abonosCliente.length){
+    let totalAbonado=abonosCliente.reduce((s,l)=>s+l.valor,0);
+    let filas=abonosCliente.map(l=>{
+      let badge=l.tipo==='abono'
+        ?'<span style="font-size:10px;background:#fff3cd;color:#856404;border-radius:4px;padding:2px 6px;font-weight:700;margin-right:5px;">Abono</span>'
+        :l.tipo==='individual'
+        ?'<span style="font-size:10px;background:var(--green-light);color:var(--green);border-radius:4px;padding:2px 6px;font-weight:700;margin-right:5px;">Pago indiv.</span>'
+        :'<span style="font-size:10px;background:var(--green-light);color:var(--green);border-radius:4px;padding:2px 6px;font-weight:700;margin-right:5px;">Pago total</span>';
+      let nota=l.notas?`<span style="color:var(--muted);font-size:11px;">${l.notas}</span>`:'';
+      return`<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 10px;border-bottom:1px solid var(--border2);gap:8px;">
+        <div style="color:var(--muted);font-size:11.5px;white-space:nowrap;">${fmtFechaHora(l.fecha)}</div>
+        <div style="flex:1;font-size:12px;">${badge}${nota}</div>
+        <div style="font-weight:800;color:var(--green);font-family:var(--font-head);font-size:14px;white-space:nowrap;">+${fmt(l.valor)}</div>
+      </div>`;
+    }).join('');
+    abonosHtml=`<div class="slabel" style="margin-top:14px;">💚 Historial de pagos (${abonosCliente.length})</div>
+    <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;overflow:hidden;max-height:190px;overflow-y:auto;margin-bottom:6px;">
+      ${filas}
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:var(--green-light);border-top:1px solid rgba(26,122,74,.15);">
+        <span style="color:var(--green);font-size:12px;font-weight:700;">Total abonado</span>
+        <span style="color:var(--green);font-family:var(--font-head);font-size:15px;font-weight:800;">${fmt(totalAbonado)}</span>
+      </div>
+    </div>`;
+  }
+
+  let existHtml=movs.length
+    ?movs.map(m=>`<div class="pitem"><div class="info"><div class="name">${m.producto} <button onclick="editarProductoModal(${m.id})" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--ink3);padding:1px 4px;border-radius:4px;" title="Editar producto">✏️</button></div><div class="meta">📅 ${fmtFechaHora(m.fecha)} &nbsp;·&nbsp; ×${m.cantidad} und &nbsp;·&nbsp; ${fmt(m.valorUnit)} c/u</div></div><div style="display:flex;align-items:center;gap:6px;"><div class="price">${fmt(m.valorUnit*m.cantidad)}</div><button onclick="eliminarProductoDeuda(${m.id})" style="background:none;border:none;cursor:pointer;color:var(--red);font-size:13px;padding:3px 5px;border-radius:5px;opacity:.7;transition:.13s;" title="Eliminar producto" onmouseover="this.style.opacity=1;this.style.background='var(--red-light)'" onmouseout="this.style.opacity=.7;this.style.background='none'">🗑️</button></div></div>`).join('')
+    :'<div style="padding:14px;text-align:center;color:var(--muted);font-size:13px">Sin productos pendientes 🎉</div>';
+
+  let nuevosHtml=detItems.length
+    ?detItems.map(x=>`<div class="mps-item">
+        <div class="mps-item-name">${x.p}</div>
+        <div class="mps-item-qty">×${x.q} &nbsp;·&nbsp; ${fmt(x.v)} c/u</div>
+        <div class="mps-item-price">${fmt(x.q*x.v)}</div>
+        <button class="pitem-remove" onclick="detEliminar(${x.id})">✕</button>
+      </div>`).join('')
+    :'<div class="mps-empty">Agrega productos con el formulario de abajo ↓</div>';
+
+  document.getElementById('det-title').textContent='📋 Cuenta de '+c.nombre;
+  document.getElementById('det-body').innerHTML=`
+    <div class="cmh"><div class="avatar-lg" style="background:${c.color}22;color:${c.color}">${ini(c.nombre)}</div><div style="flex:1"><div class="cmh-name">${c.nombre}</div><div class="cmh-meta">📞 ${c.telefono}</div></div><button class="btn btn-xs btn-ghost" style="align-self:center;white-space:nowrap;" onclick="closeModal('m-det');editarCliente(${id})">✏️ Editar datos</button></div>
+
+    ${movs.length?`<div class="slabel">Pendiente (${movs.length})</div>
+    <div class="product-list-modal" style="max-height:160px;">${existHtml}</div>
+    <div class="total-row" style="margin:8px 0 14px;padding:10px 14px;">
+      <span class="label" style="font-size:13px;">💰 Deuda actual</span>
+      <span class="amount" style="font-size:18px;">${fmt(totalExist)}</span>
+    </div>`:`<div style="background:var(--green-light);border:1px solid rgba(45,122,58,.2);border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:13px;color:var(--green)">✅ ${c.nombre} no tiene deuda pendiente${ultimoPago(id)?'<div style=\"font-size:12px;margin-top:4px;\">💚 Último pago: '+fmtFechaHora(ultimoPago(id))+'</div>':''}</div>`}
+    ${abonosHtml}
+    <div class="add-line-form">
+      <div class="add-line-title">➕ Agregar producto${detItems.length>0?' — puedes seguir añadiendo más':''}</div>
+      <div class="add-line-row">
+        <div class="form-group" style="margin:0;"><label class="form-label">Producto</label><input class="form-input" id="det-np" placeholder="Nombre" onkeydown="if(event.key==='Enter')document.getElementById('det-nv').focus()"></div>
+        <div class="form-group" style="margin:0;"><label class="form-label">Cantidad</label><input class="form-input" id="det-nq" type="number" min="1" value="1" oninput="detPrev()"></div>
+        <div class="form-group" style="margin:0;"><label class="form-label">Valor $ *</label><input class="form-input" id="det-nv" type="number" min="0" placeholder="0" oninput="detPrev()" onkeydown="if(event.key==='Enter')detAgregar()"></div>
+        <div><button class="btn btn-primary" onclick="detGuardarDirecto()" style="height:42px;margin-top:17px;white-space:nowrap;">💾 Guardar</button></div>
+      </div>
+      <div id="det-prev-line" style="display:none;font-size:12.5px;color:var(--accent);font-weight:700;margin-top:5px;text-align:right;"></div>
+    </div>
+
+    ${detItems.length?`<div class="slabel">Por guardar (${detItems.length})</div>
+    <div class="mps-list">${nuevosHtml}</div>
+    <div class="total-row" style="background:linear-gradient(135deg,#e6f5ee,#f5fff6);border-color:rgba(26,122,74,.25);">
+      <span class="label">🆕 Nuevo total si guardas</span>
+      <span class="amount" style="color:var(--green)">${fmt(totalFinal)}</span>
+    </div>`:''}
+
+    <div class="form-group" style="margin-top:10px;"><label class="form-label">Fecha</label><input class="form-input" id="det-fecha" type="date" value="${today()}" style="max-width:200px;"></div>
+
+    <div class="form-actions">
+      <button class="btn btn-ghost" onclick="closeModal('m-det')">Cerrar</button>
+      <button class="btn btn-ghost" onclick="imprimirCuenta(${id})">📄 Descargar PDF</button>
+      ${totalExist>0?`<button class="btn btn-success" style="background:#25D366;border:none;" onclick="enviarWhatsApp(${id},'deuda')">💬 Enviar por WhatsApp</button>`:''}
+      ${detItems.length?`<button class="btn btn-primary" onclick="detGuardar()">✓ Guardar ${detItems.length} producto${detItems.length!==1?'s':''}</button>`:''}
+      ${totalExist>0?`<button class="btn btn-success" onclick="liquidar(${id})">✓ Liquidar Cuenta</button>`:''}
+    </div>`;
+}
+
+function detPrev(){
+  let q=parseFloat(document.getElementById('det-nq')?.value)||0;
+  let v=parseFloat(document.getElementById('det-nv')?.value)||0;
+  let el=document.getElementById('det-prev-line');
+  if(el){if(q*v>0){el.style.display='block';el.textContent='Subtotal: '+fmt(q*v);}else el.style.display='none';}
+}
+function detAgregar(){
+  let p=(document.getElementById('det-np')?.value||'').trim();
+  let q=parseInt(document.getElementById('det-nq')?.value)||1;
+  let v=parseFloat(document.getElementById('det-nv')?.value)||0;
+  if(!p){toast('⚠️ Escribe el nombre del producto','info');return;}
+  if(!v){toast('⚠️ Ingresa el valor','info');return;}
+  detItems.push({p,q,v,id:Date.now()+Math.random()});
+  document.getElementById('det-np').value='';
+  document.getElementById('det-nq').value=1;
+  document.getElementById('det-nv').value='';
+  _renderDetalle();
+  setTimeout(()=>document.getElementById('det-np')?.focus(),50);
+}
+function detEliminar(uid){
+  detItems=detItems.filter(x=>x.id!==uid);
+  _renderDetalle();
+}
+function detGuardar(){
+  if(!detItems.length)return;
+  let f=document.getElementById('det-fecha')?.value||today();
+  detItems.forEach(x=>{
+    db.movimientos.push({id:db.nmi++,clienteId:detClienteId,producto:x.p,cantidad:x.q,valorUnit:x.v,fecha:f,pagado:false,tipo:'individual'});
+  });
+  let total=detItems.reduce((s,x)=>s+x.q*x.v,0);
+  let n=detItems.length;
+  detItems=[];
+  save(`Agregar ${n} producto${n!==1?'s':''}`);refreshAll();
+  _renderDetalle();
+  toast(`✓ ${n} producto${n!==1?'s':''} agregado${n!==1?'s':''} — ${fmt(total)}`);
+}
+
+// ═══════════════════════════════════════════
+// ENVIAR COBRO POR WHATSAPP
+// ═══════════════════════════════════════════
+function formatearTelefono(tel){
+  if(!tel||tel==='—')return null;
+  let digits=tel.replace(/\D/g,'');
+  if(!digits)return null;
+  // Si empieza con 57 (Colombia) y tiene 12 dígitos, ok
+  if(digits.startsWith('57')&&digits.length>=11)return digits;
+  // Si tiene 10 dígitos (número local Colombia), agrega 57
+  if(digits.length===10)return '57'+digits;
+  // Si tiene 7 (sin área), no podemos saber
+  return digits.length>=7?'57'+digits:null;
+}
+
+function enviarWhatsApp(clienteId, modo){
+  // modo: 'deuda' = productos pendientes | 'liquidar' = cuenta a cobrar
+  let c=db.clientes.find(x=>x.id===clienteId);
+  if(!c)return;
+  let tel=formatearTelefono(c.telefono);
+  if(!tel){
+    toast('⚠️ Este cliente no tiene número de teléfono registrado','info');
+    return;
+  }
+  let movs=activos(clienteId);
+  let total=deuda(clienteId);
+  if(!movs.length){toast('ℹ️ Este cliente no tiene productos pendientes','info');return;}
+
+  // Construir lista de productos
+  let lista=movs.map(m=>{
+    let subtotal=m.valorUnit*m.cantidad;
+    let linea=`• ${m.producto}`;
+    if(m.cantidad>1) linea+=` ×${m.cantidad}`;
+    linea+=` = ${fmt(subtotal)}`;
+    return linea;
+  }).join('\n');
+
+  let fecha=new Date().toLocaleDateString('es-CO',{day:'2-digit',month:'long',year:'numeric'});
+  let encabezado=modo==='liquidar'
+    ? `Hola ${c.nombre.split(' ')[0]}, te comparto el resumen de tu cuenta para proceder con el cobro:`
+    : `Hola ${c.nombre.split(' ')[0]}, te enviamos el resumen de tu cuenta en *Tienda Eben-ezer*:`;
+
+  // Nequi info en el mensaje de texto
+  let nequiCfg=JSON.parse(localStorage.getItem('te4_nequi')||'{}');
+  let nequiMsg='';
+  if(nequiCfg.numero){
+    nequiMsg=`\n\n*PAGAR POR NEQUI:*\n*Número:* ${nequiCfg.numero}\n*Cuenta:* ${nequiCfg.nombre||'Tienda Eben-ezer'}`;
+  }
+
+  let mensaje=
+`${encabezado}
+
+*PRODUCTOS PENDIENTES:*
+${lista}
+
+*TOTAL A PAGAR: ${fmt(total)}*${nequiMsg}
+
+_Fecha: ${fecha}_
+_Tienda Eben-ezer_
+
+_Gracias por tu preferencia_`;
+
+  let url=`https://wa.me/${tel}?text=${encodeURIComponent(mensaje)}`;
+
+  // Si hay QR configurado, mostrar panel para que lo envíe manualmente
+  if(nequiCfg.qrImg){
+    _mostrarPanelQR(url, nequiCfg);
+  } else {
+    window.open(url,'_blank');
+  }
+}
+
+function _mostrarPanelQR(waUrl, nequiCfg){
+  // Crear o reutilizar overlay del panel QR
+  let overlay=document.getElementById('qr-send-overlay');
+  if(!overlay){
+    overlay=document.createElement('div');
+    overlay.id='qr-send-overlay';
+    overlay.style.cssText='position:fixed;inset:0;background:rgba(15,30,60,.5);z-index:1000;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);';
+    document.body.appendChild(overlay);
+  }
+  overlay.innerHTML=`
+    <div style="background:#fff;border-radius:18px;padding:28px;width:340px;max-width:94vw;box-shadow:0 20px 60px rgba(15,30,60,.25);text-align:center;font-family:var(--font-body);">
+      <div style="font-family:var(--font-head);font-size:19px;font-weight:800;color:var(--text);margin-bottom:4px;">📤 Enviar cuenta por WhatsApp</div>
+      <div style="font-size:12.5px;color:var(--muted);margin-bottom:18px;">Sigue estos 2 pasos para compartir el QR de Nequi</div>
+
+      <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:12px;padding:14px;margin-bottom:16px;">
+        <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px;">Paso 1 — Guarda el QR en tu celular</div>
+        <img src="${nequiCfg.qrImg}" style="width:160px;height:160px;object-fit:contain;border-radius:8px;border:2px solid var(--border);display:block;margin:0 auto 10px;">
+        <div style="font-size:13px;font-weight:700;color:var(--text);">📱 ${nequiCfg.numero||''}</div>
+        <div style="font-size:12px;color:var(--muted);">${nequiCfg.nombre||'Tienda Eben-ezer'}</div>
+        <a href="${nequiCfg.qrImg}" download="nequi-qr-tienda.png" style="display:inline-block;margin-top:10px;padding:7px 16px;background:var(--accent);color:#fff;border-radius:8px;font-size:12.5px;font-weight:700;text-decoration:none;">⬇️ Descargar QR</a>
+      </div>
+
+      <div style="background:var(--green-light);border:1px solid rgba(26,122,74,.2);border-radius:10px;padding:12px;margin-bottom:16px;font-size:12.5px;color:var(--green);text-align:left;">
+        <strong>Paso 2</strong> — Abre WhatsApp, envía el mensaje y adjunta manualmente la imagen del QR que descargaste.
+      </div>
+
+      <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">
+        <button onclick="document.getElementById('qr-send-overlay').style.display='none'" style="padding:9px 18px;border-radius:8px;border:1.5px solid var(--border);background:#fff;font-weight:600;font-size:13px;cursor:pointer;font-family:var(--font-body);">Cancelar</button>
+        <button onclick="window.open('${waUrl}','_blank');document.getElementById('qr-send-overlay').style.display='none';" style="padding:9px 18px;border-radius:8px;border:none;background:#25D366;color:#fff;font-weight:700;font-size:13px;cursor:pointer;font-family:var(--font-body);">💬 Abrir WhatsApp →</button>
+      </div>
+    </div>`;
+  overlay.style.display='flex';
+  overlay.onclick=function(e){if(e.target===overlay)overlay.style.display='none';};
+}
+
+// ═══════════════════════════════════════════
+// LIQUIDAR
+// ═══════════════════════════════════════════
+function liquidar(id){
+  let c=db.clientes.find(x=>x.id===id),movs=activos(id),total=deuda(id);
+  document.getElementById('det-title').textContent='💳 Liquidar Cuenta';
+  let items=movs.map(m=>`<div class="pitem"><div class="info"><div class="name">${m.producto} <button onclick="editarProductoModal(${m.id})" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--ink3);padding:1px 4px;border-radius:4px;" title="Editar producto">✏️</button></div><div class="meta">📅 ${fmtFechaHora(m.fecha)} &nbsp;·&nbsp; ×${m.cantidad} und &nbsp;·&nbsp; ${fmt(m.valorUnit)} c/u</div></div><div style="display:flex;align-items:center;gap:6px;"><div class="price">${fmt(m.valorUnit*m.cantidad)}</div><button onclick="eliminarProductoDeuda(${m.id})" style="background:none;border:none;cursor:pointer;color:var(--red);font-size:13px;padding:3px 5px;border-radius:5px;opacity:.7;" title="Eliminar">🗑️</button></div></div>`).join('');
+  document.getElementById('det-body').innerHTML=`
+    <div class="cmh"><div class="avatar-lg" style="background:${c.color}22;color:${c.color}">${ini(c.nombre)}</div><div><div class="cmh-name">${c.nombre}</div><div class="cmh-meta">Resumen de cuenta a liquidar</div></div></div>
+    <div class="slabel">Productos Pendientes (${movs.length})</div>
+    <div class="product-list-modal">${items}</div>
+    <div class="total-row"><span class="label">💰 Total a Cobrar</span><span class="amount">${fmt(total)}</span></div>
+    <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:11px 13px;margin:10px 0;">
+      <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">💳 Abono Parcial (opcional)</div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <input class="form-input" id="liq-abono-val" type="number" min="0" max="${total}" placeholder="Valor del abono $" style="max-width:200px;" oninput="liqPrevAbono(${total})">
+        <span style="font-size:12px;color:var(--muted)">Deja vacío para pago total</span>
+      </div>
+      <div id="liq-abono-prev" style="display:none;margin-top:6px;font-size:12px;color:var(--accent);font-weight:700;"></div>
+    </div>
+    <div style="background:var(--green-light);border:1px solid rgba(26,122,74,.2);border-radius:8px;padding:11px 13px;margin:10px 0;font-size:13px;color:var(--green)">
+      ✅ Al confirmar pago total, todos los productos quedarán liquidados. Con abono parcial se registra el pago y queda el saldo pendiente.
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-ghost" onclick="closeModal('m-det')">Cancelar</button>
+      <button class="btn btn-ghost" onclick="imprimirCuenta(${id})">📄 Descargar PDF</button>
+      <button class="btn btn-success" style="background:#25D366;border:none;" onclick="enviarWhatsApp(${id},'liquidar')">💬 Cobrar por WA</button>
+      <button class="btn btn-warning" onclick="(function(){let v=parseFloat(document.getElementById('liq-abono-val')?.value)||0;if(!v||v<=0){toast('⚠️ Ingresa el valor del abono','info');return;}let s=${total}-v;pedirConfirmAbono('${c.nombre}',v,s,function(){confirmarAbonoParcial(${id},${total})});})()">💰 Confirmar Abono</button>
+      <button class="btn btn-success" onclick="pedirConfirmPagoTotal(${id},${total},${movs.length},function(){confirmarPago(${id},${total},${movs.length})})">✓ Pago Total</button>
+    </div>`;
+  openModal('m-det');
+}
+
+function liqPrevAbono(total){
+  let v=parseFloat(document.getElementById('liq-abono-val')?.value)||0;
+  let el=document.getElementById('liq-abono-prev');
+  if(!el)return;
+  if(v>0&&v<total){el.style.display='block';el.textContent='Abono: '+fmt(v)+' — Saldo pendiente: '+fmt(total-v);}
+  else if(v>=total){el.style.display='block';el.textContent='⚠️ El abono cubre la deuda total. Usa "Pago Total" para liquidar.';}
+  else el.style.display='none';
+}
+
+function confirmarAbonoParcial(id,total){
+  let abono=parseFloat(document.getElementById('liq-abono-val')?.value)||0;
+  if(!abono||abono<=0){toast('⚠️ Ingresa el valor del abono','info');return;}
+  if(abono>=total){if(!confirm('El abono cubre o supera la deuda total. ¿Deseas liquidar completamente?'))return;confirmarPago(id,total,activos(id).length);return;}
+  let c=db.clientes.find(x=>x.id===id);
+  // Descontar el abono de los movimientos activos, del más antiguo al más reciente
+  let movsPend=db.movimientos.filter(m=>m.clienteId===id&&!m.pagado).sort((a,b)=>new Date(a.fecha)-new Date(b.fecha));
+  let restante=abono;
+  let detalle=[];
+  for(let m of movsPend){
+    if(restante<=0)break;
+    let subtotal=m.valorUnit*m.cantidad;
+    if(restante>=subtotal){
+      // Este movimiento queda saldado
+      m.pagado=true;
+      detalle.push({producto:m.producto,cantidad:m.cantidad,valorUnit:m.valorUnit,fecha:m.fecha});
+      restante-=subtotal;
+    } else {
+      // Abono parcial a este movimiento: reducimos el valorUnit proporcionalmente
+      let cantPagada=restante/m.valorUnit;
+      if(cantPagada>=m.cantidad){
+        m.pagado=true;
+        detalle.push({producto:m.producto,cantidad:m.cantidad,valorUnit:m.valorUnit,fecha:m.fecha});
+      } else {
+        // Dividir en dos: la parte pagada y el saldo restante
+        let cantPag=Math.floor(cantPagada);
+        let pagoParcial=restante;
+        // Reducir el valor unitario del movimiento existente para reflejar el saldo
+        let nuevoTotal=subtotal-pagoParcial;
+        m.valorUnit=nuevoTotal/m.cantidad;
+        detalle.push({producto:m.producto+' (abono)',cantidad:m.cantidad,valorUnit:pagoParcial/m.cantidad,fecha:m.fecha});
+      }
+      restante=0;
+    }
+  }
+  let saldo=deuda(id);
+  db.liquidaciones.push({id:db.nli++,clienteId:id,fecha:nowDateTime(),valor:abono,productos:detalle.length,detalle,notas:'Abono parcial',tipo:'abono'});
+  save(`Abono parcial de ${c.nombre}: ${fmt(abono)}`);
+  closeModal('m-det');
+  refreshAll();
+  toast(`✓ Abono de ${fmt(abono)} registrado para ${c.nombre} — Saldo: ${fmt(saldo)}`);
+  // WA: sin número Nequi en comprobante de abono
+  let tel=formatearTelefono(c.telefono);
+  if(tel){
+    let msg=`*COMPROBANTE DE ABONO*\nTienda Eben-ezer\n\nHola ${c.nombre.split(' ')[0]}, confirmamos tu abono:\n\n*Abono recibido:* ${fmt(abono)}\n*Saldo pendiente:* ${fmt(saldo)}\n*Fecha:* ${new Date().toLocaleDateString('es-CO',{day:'2-digit',month:'long',year:'numeric'})} ${new Date().toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'})}\n\n🏪 _Gracias por tu pago — Tienda Eben-ezer_`;
+    toastWA('✓ Abono registrado — ¿enviar comprobante?','https://wa.me/'+tel+'?text='+encodeURIComponent(msg));
+  }
+}
+
+let _confirmAbonoCallback=null;
+function pedirConfirmAbono(clienteNombre, abono, saldo, callback){
+  _confirmAbonoCallback=callback;
+  document.getElementById('confirm-abono-body').innerHTML=`
+    <div style="text-align:center;padding:6px 0 14px;">
+      <div style="font-size:42px;margin-bottom:6px;">💳</div>
+      <div style="font-family:var(--font-head);font-size:16px;font-weight:800;color:var(--text);">¿Confirmar abono de <span style="color:var(--accent);">${clienteNombre.split(' ')[0]}</span>?</div>
+      <div style="font-size:13px;color:var(--muted);margin-top:4px;">Se registrará el abono y se descontará del saldo pendiente.</div>
+    </div>
+    <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;overflow:hidden;margin-bottom:14px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid var(--border2);">
+        <span style="font-size:13px;color:var(--text2);font-weight:600;">💰 Abono a registrar</span>
+        <span style="font-family:var(--font-head);font-size:20px;font-weight:800;color:var(--amber,#e07b0a);">${fmt(abono)}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:linear-gradient(135deg,var(--surface2),#f0f7ff);">
+        <span style="font-size:13px;color:var(--text2);font-weight:600;">📋 Saldo que quedará</span>
+        <span style="font-family:var(--font-head);font-size:18px;font-weight:800;color:var(--accent);">${fmt(Math.max(0,saldo))}</span>
+      </div>
+    </div>
+    <div style="background:#fff8e1;border:1px solid #ffe082;border-radius:8px;padding:10px 12px;margin-bottom:16px;font-size:12.5px;color:#7c5c00;">
+      ⚠️ Verifica el valor del abono antes de confirmar.
+    </div>
+    <div class="form-actions" style="margin-top:0;">
+      <button class="btn btn-ghost" onclick="closeModal('m-confirm-abono')">✕ Cancelar</button>
+      <button class="btn btn-warning" onclick="closeModal('m-confirm-abono');if(_confirmAbonoCallback)_confirmAbonoCallback();">💰 Sí, registrar abono</button>
+    </div>`;
+  openModal('m-confirm-abono');
+}
+
+let _confirmPagoCallback=null;
+function pedirConfirmPagoTotal(id, total, numProductos, callback){
+  let c=db.clientes.find(x=>x.id===id);
+  if(!c)return;
+  _confirmPagoCallback=callback;
+  let movs=db.movimientos.filter(m=>m.clienteId===id&&!m.pagado);
+  let lista=movs.slice(0,5).map(m=>{
+    let sub=fmt(m.valorUnit*m.cantidad);
+    let nom=m.producto+(m.cantidad>1?' ×'+m.cantidad:'');
+    return`<div style="display:flex;justify-content:space-between;padding:5px 8px;border-bottom:1px solid var(--border2);font-size:12.5px;"><span style="color:var(--text2);">${nom}</span><span style="font-weight:700;color:var(--accent);">${sub}</span></div>`;
+  }).join('');
+  let masItems=movs.length>5?`<div style="padding:5px 8px;font-size:12px;color:var(--muted);text-align:center;">...y ${movs.length-5} producto(s) más</div>`:'';
+  document.getElementById('confirm-pago-body').innerHTML=`
+    <div style="text-align:center;padding:6px 0 14px;">
+      <div style="font-size:42px;margin-bottom:6px;">💳</div>
+      <div style="font-family:var(--font-head);font-size:16px;font-weight:800;color:var(--text);">¿Confirmar pago total de <span style="color:var(--accent);">${c.nombre.split(' ')[0]}</span>?</div>
+      <div style="font-size:13px;color:var(--muted);margin-top:4px;">Esta acción marcará todos los productos como pagados.</div>
+    </div>
+    <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;overflow:hidden;margin-bottom:14px;">
+      ${lista}${masItems}
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:9px 8px;background:linear-gradient(135deg,var(--accent-light),#f0f7ff);border-top:2px solid var(--border);">
+        <span style="font-weight:700;font-size:13px;color:var(--text2);">💰 Total a liquidar</span>
+        <span style="font-family:var(--font-head);font-size:20px;font-weight:800;color:var(--accent);">${fmt(total)}</span>
+      </div>
+    </div>
+    <div style="background:#fff8e1;border:1px solid #ffe082;border-radius:8px;padding:10px 12px;margin-bottom:16px;font-size:12.5px;color:#7c5c00;">
+      ⚠️ Verifica que el cliente ya realizó el pago antes de confirmar.
+    </div>
+    <div class="form-actions" style="margin-top:0;">
+      <button class="btn btn-ghost" onclick="closeModal('m-confirm-pago')">✕ Cancelar</button>
+      <button class="btn btn-success" onclick="closeModal('m-confirm-pago');if(_confirmPagoCallback)_confirmPagoCallback();">✅ Sí, confirmar pago total</button>
+    </div>`;
+  openModal('m-confirm-pago');
+}
+
+function confirmarPago(id,total,numProductos){
+  let c=db.clientes.find(x=>x.id===id);
+  let movsPagados=db.movimientos.filter(m=>m.clienteId===id&&!m.pagado);
+  let detallePagado=movsPagados.map(m=>({producto:m.producto,cantidad:m.cantidad,valorUnit:m.valorUnit,fecha:m.fecha}));
+  movsPagados.forEach(m=>m.pagado=true);
+  let fechaLiq=nowDateTime();
+  db.liquidaciones.push({id:db.nli++,clienteId:id,fecha:fechaLiq,valor:total,productos:numProductos,detalle:detallePagado,notas:'',tipo:'total'});
+  save(`Liquidar cuenta de ${c.nombre}`);
+  closeModal('m-det');
+  refreshAll();
+  toast(`✓ Cuenta de ${c.nombre} liquidada — ${fmt(total)}`);
+  let tel=formatearTelefono(c.telefono);
+  if(tel){
+    let lista=detallePagado.map(p=>`• ${p.producto}${p.cantidad>1?' ×'+p.cantidad:''} = ${fmt(p.valorUnit*p.cantidad)}`).join('\n');
+    let fechaStr=new Date().toLocaleDateString('es-CO',{day:'2-digit',month:'long',year:'numeric'})+' '+new Date().toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'});
+    let msg=`*COMPROBANTE DE PAGO TOTAL*\nTienda Eben-ezer\n\nHola ${c.nombre.split(' ')[0]}, confirmamos el pago total de tu cuenta:\n\n*Productos pagados:*\n${lista}\n\n*Total cancelado: ${fmt(total)}*\n*Fecha:* ${fechaStr}\n\nGracias por tu pago.`;
+    toastWA('✓ Cuenta liquidada — ¿enviar comprobante?','https://wa.me/'+tel+'?text='+encodeURIComponent(msg));
+  }
+}
+
+// ═══════════════════════════════════════════
+// MOVIMIENTO GENERAL
+// ═══════════════════════════════════════════
+function openMov(){
+  document.getElementById('mv-c').innerHTML=db.clientes.map(c=>`<option value="${c.id}">${c.nombre}</option>`).join('');
+  document.getElementById('mv-f').value=today();
+  openModal('m-mv');
+}
+function prevMv(){
+  let q=parseFloat(document.getElementById('mv-q').value)||0;
+  let v=parseFloat(document.getElementById('mv-v').value)||0;
+  let el=document.getElementById('mv-prev');
+  if(el){el.style.display=q*v>0?'flex':'none';document.getElementById('mv-prev-v').textContent=fmt(q*v);}
+}
+function crearMov(){
+  let cid=parseInt(document.getElementById('mv-c').value);
+  let p=(document.getElementById('mv-p').value||'').trim();
+  let q=parseInt(document.getElementById('mv-q').value)||1;
+  let v=parseFloat(document.getElementById('mv-v').value)||0;
+  let f=document.getElementById('mv-f').value||today();
+  if(!cid||!p||!v){toast('⚠️ Completa los campos obligatorios','info');return;}
+  let dt2=f+'T'+new Date().toTimeString().slice(0,5);db.movimientos.push({id:db.nmi++,clienteId:cid,producto:p,cantidad:q,valorUnit:v,fecha:dt2,pagado:false,tipo:'individual'});
+  let c=db.clientes.find(x=>x.id===cid);
+  save(`Registrar "${p}" para ${c?.nombre||''}`);closeModal('m-mv');
+  document.getElementById('mv-p').value='';document.getElementById('mv-v').value='';document.getElementById('mv-q').value=1;
+  refreshAll();
+  toast(`✓ "${p}" registrado para ${c?.nombre}`);
+}
+
+// ═══════════════════════════════════════════
+// CREAR CLIENTE — con productos iniciales
+// ═══════════════════════════════════════════
+let ncProds=[];
+document.addEventListener('DOMContentLoaded',()=>{
+  document.getElementById('nc-fecha').value=today();
+});
+function ncAgregarProd(){
+  let p=(document.getElementById('nc-pnombre').value||'').trim();
+  let q=parseInt(document.getElementById('nc-pq').value)||1;
+  let v=parseFloat(document.getElementById('nc-pv').value)||0;
+  if(!p){toast('⚠️ Escribe el nombre del producto','info');return;}
+  if(!v){toast('⚠️ Ingresa el valor','info');return;}
+  ncProds.push({p,q,v,id:Date.now()+Math.random()});
+  document.getElementById('nc-pnombre').value='';
+  document.getElementById('nc-pq').value=1;
+  document.getElementById('nc-pv').value='';
+  _renderNcProds();
+  setTimeout(()=>document.getElementById('nc-pnombre')?.focus(),50);
+}
+function _renderNcProds(){
+  let lista=document.getElementById('nc-prod-list');
+  let mps=document.getElementById('nc-mps-list');
+  let total=ncProds.reduce((s,x)=>s+x.q*x.v,0);
+  if(!ncProds.length){lista.style.display='none';return;}
+  lista.style.display='block';
+  mps.innerHTML=ncProds.map(x=>`<div class="mps-item">
+    <div class="mps-item-name">${x.p} <button onclick="ncEditProd(${x.id})" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--ink3);padding:1px 4px;border-radius:4px;" title="Editar nombre">✏️</button></div>
+    <div class="mps-item-qty">×${x.q} · ${fmt(x.v)} c/u</div>
+    <div class="mps-item-price">${fmt(x.q*x.v)}</div>
+    <button class="pitem-remove" onclick="ncElimProd(${x.id})">✕</button>
+  </div>`).join('');
+  document.getElementById('nc-total-v').textContent=fmt(total);
+}
+function ncElimProd(uid){
+  ncProds=ncProds.filter(x=>x.id!==uid);
+  _renderNcProds();
+}
+function ncEditProd(uid){
+  let item=ncProds.find(x=>x.id===uid);
+  if(!item)return;
+  let nuevo=prompt('Editar nombre del producto:',item.p);
+  if(nuevo===null)return;
+  nuevo=nuevo.trim();
+  if(!nuevo){toast('⚠️ El nombre no puede estar vacío','info');return;}
+  item.p=nuevo;
+  _renderNcProds();
+}
+function regNcEditProd(uid){
+  let item=regNcProds.find(x=>x.id===uid);
+  if(!item)return;
+  let nuevo=prompt('Editar nombre del producto:',item.p);
+  if(nuevo===null)return;
+  nuevo=nuevo.trim();
+  if(!nuevo){toast('⚠️ El nombre no puede estar vacío','info');return;}
+  item.p=nuevo;
+  _renderRegNcProds();
+}
+function regAgEditProd(uid){
+  let item=regAgItems.find(x=>x.id===uid);
+  if(!item)return;
+  let nuevo=prompt('Editar nombre del producto:',item.p);
+  if(nuevo===null)return;
+  nuevo=nuevo.trim();
+  if(!nuevo){toast('⚠️ El nombre no puede estar vacío','info');return;}
+  item.p=nuevo;
+  _renderRegAgItems();
+}
+
+function crearCliente(){
+  let nombre=(document.getElementById('nc-n').value||'').trim();
+  if(!nombre){toast('⚠️ Ingresa el nombre','info');return;}
+  const CC=['#2563a8','#1a7a4a','#6b4c9a','#4a7fb5','#2980b9','#c0392b','#16a085','#8e44ad','#e67e22','#1abc9c'];
+  let newC={id:db.nci++,nombre,telefono:(document.getElementById('nc-t').value||'').trim()||'—',direccion:'—',color:CC[db.clientes.length%CC.length]};
+  db.clientes.push(newC);
+  // Agregar productos iniciales
+  let f=document.getElementById('nc-fecha')?.value||today();
+  if(ncProds.length){
+    ncProds.forEach(x=>{
+      db.movimientos.push({id:db.nmi++,clienteId:newC.id,producto:x.p,cantidad:x.q,valorUnit:x.v,fecha:f,pagado:false,tipo:'individual'});
+    });
+  }
+  let n=ncProds.length;
+  let totalProd=ncProds.reduce((s,x)=>s+x.q*x.v,0);
+  ncProds=[];
+  _renderNcProds();
+  save(`Nuevo cliente: ${nombre}`);closeModal('m-nc');
+  ['nc-n','nc-t'].forEach(f=>document.getElementById(f).value='');
+  refreshAll();
+  toast(`✓ Cliente registrado${n>0?` con ${n} producto${n!==1?'s':''} — ${fmt(totalProd)}`:''}`);
+}
+
+// Limpiar al abrir modal cliente
+document.getElementById('m-nc').addEventListener('click',function(){});
+function openNuevoCliente(){
+  ncProds=[];
+  _renderNcProds();
+  ['nc-n','nc-t'].forEach(id=>{let el=document.getElementById(id);if(el)el.value='';})
+  document.getElementById('nc-fecha').value=today();
+  openModal('m-nc');
+}
+
+let _editCliId=null;
+
+// ═══════════════════════════════════════════
+// EDITAR NOMBRE DE PRODUCTO
+// ═══════════════════════════════════════════
+function editarNombreProducto(movId){editarProductoModal(movId);}
+function editarProductoModal(movId){
+  let m=db.movimientos.find(x=>x.id===movId);
+  if(!m)return;
+  let c=db.clientes.find(x=>x.id===m.clienteId);
+  let overlay=document.getElementById('m-editar-producto');
+  document.getElementById('ep-body').innerHTML=`
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);padding:11px 14px;margin-bottom:14px;font-size:13px;color:var(--ink2);">
+      <span style="font-weight:600;">Cliente:</span> ${c?c.nombre:'—'} &nbsp;·&nbsp; <span style="color:var(--ink3);">${fmtFechaHora(m.fecha)}</span>
+    </div>
+    <div class="form-group"><label class="form-label">Nombre del Producto *</label>
+      <input class="form-input" id="ep-nombre" value="${m.producto}" placeholder="Nombre del producto">
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Cantidad</label>
+        <input class="form-input" id="ep-cantidad" type="number" min="1" value="${m.cantidad}" oninput="epPrev(${m.valorUnit})">
+      </div>
+      <div class="form-group"><label class="form-label">Valor Unitario ($)</label>
+        <input class="form-input" id="ep-valor" type="number" min="0" value="${m.valorUnit}" oninput="epPrev()">
+      </div>
+    </div>
+    <div id="ep-prev" style="background:var(--accent-light);border:1px solid rgba(28,79,60,.15);border-radius:var(--r);padding:9px 13px;margin-bottom:4px;display:flex;justify-content:space-between;align-items:center;">
+      <span style="font-size:12px;color:var(--ink2);">Subtotal</span>
+      <span style="font-family:var(--font-head);font-weight:800;color:var(--accent);font-size:17px;">${fmt(m.valorUnit*m.cantidad)}</span>
+    </div>
+    <div class="form-group"><label class="form-label">Fecha</label>
+      <input class="form-input" id="ep-fecha" type="date" value="${m.fecha?m.fecha.slice(0,10):today()}" style="max-width:200px;">
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-ghost" onclick="closeModal('m-editar-producto')">Cancelar</button>
+      <button class="btn btn-danger btn-sm" onclick="eliminarProductoDeuda(${movId},true)">🗑️ Eliminar</button>
+      <button class="btn btn-primary" onclick="guardarEditProducto(${movId})">✓ Guardar Cambios</button>
+    </div>`;
+  openModal('m-editar-producto');
+}
+function epPrev(){
+  let q=parseFloat(document.getElementById('ep-cantidad')?.value)||0;
+  let v=parseFloat(document.getElementById('ep-valor')?.value)||0;
+  let el=document.getElementById('ep-prev');
+  if(el)el.innerHTML=`<span style="font-size:12px;color:var(--ink2);">Subtotal</span><span style="font-family:var(--font-head);font-weight:800;color:var(--accent);font-size:17px;">${fmt(q*v)}</span>`;
+}
+function guardarEditProducto(movId){
+  let m=db.movimientos.find(x=>x.id===movId);
+  if(!m)return;
+  let nombre=(document.getElementById('ep-nombre')?.value||'').trim();
+  let cantidad=parseInt(document.getElementById('ep-cantidad')?.value)||1;
+  let valor=parseFloat(document.getElementById('ep-valor')?.value)||0;
+  let fecha=document.getElementById('ep-fecha')?.value;
+  if(!nombre){toast('⚠️ El nombre no puede estar vacío','info');return;}
+  if(!valor){toast('⚠️ Ingresa el valor','info');return;}
+  m.producto=nombre;
+  m.cantidad=cantidad;
+  m.valorUnit=valor;
+  if(fecha)m.fecha=fecha+'T'+m.fecha.split('T')[1];
+  save(`Editar producto: ${nombre}`);
+  closeModal('m-editar-producto');
+  refreshAll();
+  if(document.getElementById('m-det')?.classList.contains('open')) _renderDetalle();
+  toast('✓ Producto actualizado');
+}
+function eliminarProductoDeuda(movId, desdeModal=false){
+  let m=db.movimientos.find(x=>x.id===movId);
+  if(!m)return;
+  let c=db.clientes.find(x=>x.id===m.clienteId);
+  let subtotal=fmt(m.valorUnit*m.cantidad);
+  if(!confirm(`¿Eliminar "${m.producto}" (${subtotal}) de la deuda de ${c?c.nombre:'este cliente'}?
+
+Esta acción no se puede deshacer.`))return;
+  db.movimientos=db.movimientos.filter(x=>x.id!==movId);
+  save(`Eliminar producto: ${m.producto}`);
+  if(desdeModal)closeModal('m-editar-producto');
+  refreshAll();
+  if(document.getElementById('m-det')?.classList.contains('open')){
+    if(activos(m.clienteId).length>0) _renderDetalle();
+    else{closeModal('m-det');toast(`🗑️ Producto eliminado — ${m.producto}`);}return;
+  }
+  toast(`🗑️ Producto "${m.producto}" eliminado`);
+}
+function editarCliente(id){
+  let c=db.clientes.find(x=>x.id===id);if(!c)return;
+  _editCliId=id;
+  document.getElementById('ec-nombre').value=c.nombre;
+  document.getElementById('ec-tel').value=c.telefono==='—'?'':c.telefono;
+  openModal('m-edit-cli');
+}
+function guardarEditCliente(){
+  let c=db.clientes.find(x=>x.id===_editCliId);if(!c)return;
+  let nombre=(document.getElementById('ec-nombre').value||'').trim();
+  if(!nombre){toast('⚠️ El nombre es obligatorio','info');return;}
+  c.nombre=nombre;
+  c.telefono=(document.getElementById('ec-tel').value||'').trim()||'—';
+  save(`Editar cliente: ${nombre}`);closeModal('m-edit-cli');refreshAll();
+  toast(`✓ Cliente "${nombre}" actualizado`);
+}
+function eliminarCliente(id){
+  let c=db.clientes.find(x=>x.id===id);if(!c)return;
+  let d=deuda(id);
+  let msg=`¿Eliminar a ${c.nombre}?${d>0?' Tiene una deuda pendiente de '+fmt(d)+'.':''}
+
+Se eliminarán también todos sus movimientos y liquidaciones.`;
+  if(!confirm(msg))return;
+  db.clientes=db.clientes.filter(x=>x.id!==id);
+  db.movimientos=db.movimientos.filter(x=>x.clienteId!==id);
+  db.liquidaciones=db.liquidaciones.filter(x=>x.clienteId!==id);
+  save(`Eliminar cliente: ${c.nombre}`);refreshAll();
+  toast(`🗑️ Cliente "${c.nombre}" eliminado`);
+}
+
+function guardarNequiConfig(){
+  let num=(document.getElementById('nequi-num').value||'').trim();
+  let nombre=(document.getElementById('nequi-nombre').value||'').trim()||'Tienda Eben-ezer';
+  let imgData=document.getElementById('nequi-qr-img')?.src||'';
+  let hasImg=imgData&&imgData.startsWith('data:image');
+  localStorage.setItem('te4_nequi',JSON.stringify({numero:num,nombre,qrImg:hasImg?imgData:''}));
+  closeModal('m-nequi-config');
+  toast('✓ Configuración Nequi/QR guardada');
+}
+function cargarQRNequi(e){
+  let f=e.target.files[0];if(!f)return;
+  let r=new FileReader();
+  r.onload=ev=>{
+    let img=document.getElementById('nequi-qr-img');
+    let prev=document.getElementById('nequi-preview');
+    img.src=ev.target.result;
+    prev.style.display='block';
+  };
+  r.readAsDataURL(f);
+}
+function prevNequiQR(){
+  let num=document.getElementById('nequi-num')?.value||'';
+  let nombre=document.getElementById('nequi-nombre')?.value||'Tienda Eben-ezer';
+  // Show text preview
+}
+function cargarDatosNequiModal(){
+  let cfg=JSON.parse(localStorage.getItem('te4_nequi')||'{}');
+  if(document.getElementById('nequi-num'))document.getElementById('nequi-num').value=cfg.numero||'';
+  if(document.getElementById('nequi-nombre'))document.getElementById('nequi-nombre').value=cfg.nombre||'';
+  if(cfg.qrImg&&document.getElementById('nequi-qr-img')){
+    document.getElementById('nequi-qr-img').src=cfg.qrImg;
+    document.getElementById('nequi-preview').style.display='block';
+  }
+}
+
+// ═══════════════════════════════════════════
+// IMPRIMIR
+// ═══════════════════════════════════════════
+function imprimirCuenta(id){
+  let c=db.clientes.find(x=>x.id===id),movs=activos(id),total=deuda(id);
+  let fechaImp=new Date().toLocaleDateString('es-CO',{year:'numeric',month:'long',day:'numeric'});
+  let rows=movs.map((m,i)=>`<tr style="border-bottom:1px solid #c5d8ee;"><td style="padding:8px 10px;color:#7a96b5">${i+1}</td><td style="padding:8px 10px;color:#7a96b5">${fmtFechaHora(m.fecha)}</td><td style="padding:8px 10px"><strong>${m.producto}</strong></td><td style="padding:8px 10px;text-align:center">${m.cantidad}</td><td style="padding:8px 10px;text-align:right;color:#3b5a82">${fmt(m.valorUnit)}</td><td style="padding:8px 10px;text-align:right;font-weight:700;color:#2563a8">${fmt(m.valorUnit*m.cantidad)}</td></tr>`).join('');
+  let html=`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>Cuenta - ${c.nombre}</title><style>
+    *{margin:0;padding:0;box-sizing:border-box;}
+    body{font-family:Georgia,serif;background:#fff;color:#1e3a5f;padding:32px;}
+    .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;padding-bottom:16px;border-bottom:3px solid #2563a8;}
+    .logo-name{font-size:26px;font-weight:800;color:#2563a8;}
+    .logo-sub{font-size:12px;color:#7a96b5;margin-top:3px;}
+    .fecha-box{text-align:right;}
+    .fecha-label{font-size:11px;color:#7a96b5;}
+    .fecha-val{font-size:13px;font-weight:700;color:#1e3a5f;}
+    .cliente-box{background:#f0f5fb;border:1px solid #c5d8ee;border-radius:10px;padding:16px;margin-bottom:22px;}
+    .cli-name{font-size:19px;font-weight:800;color:#1e3a5f;}
+    .cli-meta{font-size:12px;color:#7a96b5;margin-top:4px;}
+    .section-title{font-size:12px;font-weight:700;color:#3b5a82;text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px;}
+    table{width:100%;border-collapse:collapse;font-size:13px;}
+    thead tr{background:#2563a8;color:#fff;}
+    thead th{padding:9px 11px;text-align:left;font-weight:700;}
+    tbody td{padding:9px 11px;border-bottom:1px solid #e8f0f8;}
+    tbody tr:last-child td{border-bottom:none;}
+    .total-box{display:flex;justify-content:flex-end;margin-top:18px;}
+    .total-inner{background:#dbeafe;border:2px solid #2563a8;border-radius:10px;padding:14px 24px;text-align:right;}
+    .total-label{font-size:11px;color:#7a96b5;font-weight:700;text-transform:uppercase;letter-spacing:.5px;}
+    .total-val{font-size:30px;font-weight:800;color:#2563a8;}
+    .firmas{display:flex;justify-content:space-between;margin-top:36px;padding-top:18px;border-top:1px dashed #c5d8ee;font-size:12px;color:#7a96b5;}
+    .gracias{margin-top:20px;text-align:center;font-size:12px;color:#2563a8;}
+  </style></head><body>
+    <div class="header">
+      <div><div class="logo-name">🏪 Tienda Eben-ezer</div><div class="logo-sub">Sistema de Control de Fiados</div></div>
+      <div class="fecha-box"><div class="fecha-label">Generado el</div><div class="fecha-val">${fechaImp}</div></div>
+    </div>
+    <div class="cliente-box">
+      <div class="cli-name">${c.nombre}</div>
+      <div class="cli-meta">📞 ${c.telefono}</div>
+    </div>
+    <div class="section-title">Estado de Cuenta — Productos Pendientes (${movs.length})</div>
+    <table>
+      <thead><tr><th>#</th><th>Fecha</th><th>Producto</th><th style="text-align:center">Cant.</th><th style="text-align:right">Val. Unit.</th><th style="text-align:right">Total</th></tr></thead>
+      <tbody>${rows||'<tr><td colspan="6" style="text-align:center;color:#7a96b5;padding:20px;">Sin productos pendientes</td></tr>'}</tbody>
+    </table>
+    <div class="total-box"><div class="total-inner"><div class="total-label">Total a Pagar</div><div class="total-val">${fmt(total)}</div></div></div>
+    ${(function(){let nc=JSON.parse(localStorage.getItem('te4_nequi')||'{}');if(!nc.numero&&!nc.qrImg)return'';let qrHtml=nc.qrImg?`<img src="${nc.qrImg}" style="width:140px;height:140px;border-radius:8px;border:2px solid #2563a8;display:block;margin:8px auto 4px;object-fit:contain;">`:`<div style="width:140px;height:140px;background:#e0f2fe;border-radius:8px;border:2px solid #2563a8;display:flex;align-items:center;justify-content:center;margin:8px auto 4px;font-size:28px;">📱</div>`;return`<div style="background:#e0f2fe;border:2px solid #2563a8;border-radius:12px;padding:16px;margin-top:18px;text-align:center;"><div style="font-size:12px;font-weight:700;color:#2563a8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">💳 Pagar con Nequi</div>${qrHtml}<div style="font-size:15px;font-weight:800;color:#1e3a5f;margin-top:4px;">${nc.numero||''}</div><div style="font-size:12px;color:#7a96b5;">${nc.nombre||'Tienda Eben-ezer'}</div></div>`;}())}
+    <div class="firmas"><div>Firma del cliente: _________________________</div><div>Firma de la tienda: _________________________</div></div>
+    <div class="gracias">— Gracias por su preferencia —</div>
+  </body></html>`;
+  // Descargar como archivo HTML que el navegador puede abrir/guardar como PDF
+  let blob=new Blob([html],{type:'text/html;charset=utf-8'});
+  let url=URL.createObjectURL(blob);
+  let a=document.createElement('a');
+  let nombreArchivo=`cuenta-${c.nombre.replace(/\s+/g,'-').toLowerCase()}-${today()}.html`;
+  a.href=url;a.download=nombreArchivo;
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  toast('📄 Cuenta descargada — ábrela y guárdala como PDF');
+}
+
+// ═══════════════════════════════════════════
+// EXPORTAR EXCEL
+// ═══════════════════════════════════════════
+function exportarExcel(){
+  let wb=XLSX.utils.book_new();
+  // Hoja 1: Clientes
+  let cliData=[['ID','Nombre','Teléfono','Dirección','Deuda Total','Ítems Pendientes','Estado']];
+  db.clientes.forEach(c=>{
+    let d=deuda(c.id),mv=activos(c.id).length;
+    cliData.push([c.id,c.nombre,c.telefono,c.direccion,d,mv,d>0?'Debe':'Al día']);
+  });
+  let wsCli=XLSX.utils.aoa_to_sheet(cliData);
+  XLSX.utils.book_append_sheet(wb,wsCli,'Clientes');
+  // Hoja 2: Movimientos
+  let movData=[['ID','Fecha','Cliente','Producto','Cantidad','Valor Unitario','Total','Estado']];
+  db.movimientos.forEach(m=>{
+    let c=db.clientes.find(x=>x.id===m.clienteId);
+    movData.push([m.id,m.fecha,c?c.nombre:'—',m.producto,m.cantidad,m.valorUnit,m.valorUnit*m.cantidad,m.pagado?'Pagado':'Pendiente']);
+  });
+  let wsMov=XLSX.utils.aoa_to_sheet(movData);
+  XLSX.utils.book_append_sheet(wb,wsMov,'Movimientos');
+  // Hoja 3: Liquidaciones
+  let liqData=[['ID','Fecha','Cliente','Nº Productos','Valor Liquidado','Notas']];
+  db.liquidaciones.forEach(l=>{
+    let c=db.clientes.find(x=>x.id===l.clienteId);
+    liqData.push([l.id,l.fecha,c?c.nombre:'—',l.productos,l.valor,l.notas||'']);
+  });
+  let wsLiq=XLSX.utils.aoa_to_sheet(liqData);
+  XLSX.utils.book_append_sheet(wb,wsLiq,'Liquidaciones');
+  XLSX.writeFile(wb,`eben-ezer-${today()}.xlsx`);
+  toast('📊 Excel exportado correctamente');
+}
+
+function exportarLiquidacionesExcel(){
+  let wb=XLSX.utils.book_new();
+  let liqData=[['ID','Fecha','Cliente','Nº Productos','Valor Liquidado','Notas']];
+  db.liquidaciones.forEach(l=>{
+    let c=db.clientes.find(x=>x.id===l.clienteId);
+    liqData.push([l.id,l.fecha,c?c.nombre:'—',l.productos,l.valor,l.notas||'']);
+  });
+  let wsLiq=XLSX.utils.aoa_to_sheet(liqData);
+  XLSX.utils.book_append_sheet(wb,wsLiq,'Liquidaciones');
+  // Detalle por liquidación
+  let detData=[['Liquidación ID','Fecha Liq','Cliente','Producto','Cantidad','Valor Unit','Total Producto']];
+  db.liquidaciones.forEach(l=>{
+    let c=db.clientes.find(x=>x.id===l.clienteId);
+    (l.detalle||[]).forEach(p=>{
+      detData.push([l.id,l.fecha,c?c.nombre:'—',p.producto,p.cantidad,p.valorUnit,p.valorUnit*p.cantidad]);
+    });
+  });
+  let wsDet=XLSX.utils.aoa_to_sheet(detData);
+  XLSX.utils.book_append_sheet(wb,wsDet,'Detalle Liquidaciones');
+  XLSX.writeFile(wb,`liquidaciones-eben-ezer-${today()}.xlsx`);
+  toast('📊 Liquidaciones exportadas');
+}
+
+// ═══════════════════════════════════════════
+// EXPORTAR HTML CON DATOS EMBEBIDOS (para compartir por WhatsApp)
+// ═══════════════════════════════════════════
+function exportarHTML(){
+  // Leer el HTML actual de la página
+  let htmlActual=document.documentElement.outerHTML;
+  // Reemplazar el marcador de datos embebidos con los datos actuales
+  let datosJSON=JSON.stringify(db);
+  // Inyectar los datos como un bloque que se carga antes que localStorage
+  let scriptEmbed=`<script id="__embedded_data__">
+(function(){
+  try{
+    var embedded=${datosJSON};
+    // Solo usar los datos embebidos si localStorage está vacío o es más antiguo
+    var local=localStorage.getItem('te4_db');
+    if(!local){
+      localStorage.setItem('te4_db',JSON.stringify(embedded));
+    }
+  }catch(e){}
+})();
+<\/script>`;
+  // Insertar justo antes del primer <script> de la app
+  let htmlFinal=htmlActual.replace('<script>\n// ═══════════════════════════════════════════\n// DB + PERSISTENCIA',scriptEmbed+'\n<script>\n// ═══════════════════════════════════════════\n// DB + PERSISTENCIA');
+  // Si ya tiene datos embebidos anteriores, reemplazarlos
+  htmlFinal=htmlFinal.replace(/<script id="__embedded_data__">[\s\S]*?<\/script>\s*/g,'');
+  htmlFinal=htmlFinal.replace('<script>\n// ═══════════════════════════════════════════\n// DB + PERSISTENCIA',scriptEmbed+'\n<script>\n// ═══════════════════════════════════════════\n// DB + PERSISTENCIA');
+  let b=new Blob([htmlFinal],{type:'text/html;charset=utf-8'});
+  let a=document.createElement('a');
+  a.href=URL.createObjectURL(b);
+  a.download=`tienda-eben-ezer-${today()}.html`;
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+  URL.revokeObjectURL(a.href);
+  toast('📲 App exportada con tus datos — lista para compartir');
+}
+
+function exportarDatos(){
+  let b=new Blob([JSON.stringify(db,null,2)],{type:'application/json'});
+  let a=document.createElement('a');
+  a.href=URL.createObjectURL(b);a.download=`eben-ezer-respaldo-${today()}.json`;
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+  toast('💾 Respaldo JSON exportado');
+}
+function importarDatos(e){
+  let f=e.target.files[0];if(!f)return;
+  let ext=f.name.split('.').pop().toLowerCase();
+  if(ext==='json'){
+    let r=new FileReader();
+    r.onload=function(ev){
+      try{
+        let imp=JSON.parse(ev.target.result);
+        if(!imp.clientes||!imp.movimientos)throw new Error();
+        if(!confirm(`¿Importar datos?\nEsto reemplazará la información actual.\n\nClientes: ${imp.clientes.length}\nMovimientos: ${imp.movimientos.length}`))return;
+        db=imp;
+        if(!db.nci)db.nci=Math.max(0,...db.clientes.map(c=>c.id))+1;
+        if(!db.nmi)db.nmi=Math.max(0,...db.movimientos.map(m=>m.id))+1;
+        if(!db.liquidaciones)db.liquidaciones=[];
+        if(!db.nli)db.nli=1;
+        db.liquidaciones.forEach(l=>{if(!l.detalle)l.detalle=[];});
+        save("Importar JSON");refreshAll();
+        toast(`✓ Importado: ${db.clientes.length} clientes, ${db.movimientos.length} movimientos`);
+      }catch{toast('❌ Archivo inválido. Usa un respaldo JSON exportado desde esta app.','info');}
+    };
+    r.readAsText(f);
+  } else if(ext==='xlsx'||ext==='xls'){
+    let r=new FileReader();
+    r.onload=function(ev){
+      try{
+        let wb=XLSX.read(ev.target.result,{type:'binary'});
+        // Intentar leer hoja Clientes
+        let cliSheet=wb.Sheets['Clientes'];
+        let movSheet=wb.Sheets['Movimientos'];
+        if(!cliSheet||!movSheet){toast('❌ El Excel debe tener hojas "Clientes" y "Movimientos"','info');return;}
+        if(!confirm('¿Importar datos desde Excel?\nEsto reemplazará la información actual.'))return;
+        let cliRows=XLSX.utils.sheet_to_json(cliSheet,{header:1}).slice(1);
+        let movRows=XLSX.utils.sheet_to_json(movSheet,{header:1}).slice(1);
+        const CC=['#2563a8','#1a7a4a','#6b4c9a','#4a7fb5','#2980b9','#c0392b','#16a085'];
+        db.clientes=cliRows.filter(r=>r[1]).map((r,i)=>({id:parseInt(r[0])||i+1,nombre:String(r[1]),telefono:String(r[2]||'—'),direccion:String(r[3]||'—'),color:CC[i%CC.length]}));
+        db.movimientos=movRows.filter(r=>r[3]).map(r=>({id:parseInt(r[0])||db.nmi++,fecha:String(r[1]||today()),clienteId:parseInt(r[0])||1,producto:String(r[3]),cantidad:parseInt(r[4])||1,valorUnit:parseFloat(r[5])||0,pagado:String(r[7])==='Pagado',tipo:'individual'}));
+        // Reconstruir clienteId en movimientos por nombre
+        db.movimientos.forEach((m,i)=>{
+          let cliNombre=String(movRows[i]?.[2]||'');
+          let c=db.clientes.find(x=>x.nombre===cliNombre);
+          if(c)m.clienteId=c.id;
+        });
+        db.nci=Math.max(0,...db.clientes.map(c=>c.id))+1;
+        db.nmi=Math.max(0,...db.movimientos.map(m=>m.id))+1;
+        if(!db.liquidaciones)db.liquidaciones=[];
+        if(!db.nli)db.nli=1;
+        save("Importar Excel");refreshAll();
+        toast(`✓ Excel importado: ${db.clientes.length} clientes, ${db.movimientos.length} movimientos`);
+      }catch(err){toast('❌ Error al leer el Excel. Verifica el formato.','info');}
+    };
+    r.readAsBinaryString(f);
+  } else {
+    toast('❌ Formato no soportado. Usa .json o .xlsx','info');
+  }
+  e.target.value='';
+}
+
+// ═══════════════════════════════════════════
+// MODALES
+// ═══════════════════════════════════════════
+function openModal(id){
+  document.getElementById(id).classList.add('open');
+  if(id==='m-nequi-config')cargarDatosNequiModal();
+}
+function closeModal(id){document.getElementById(id).classList.remove('open');}
+document.querySelectorAll('.modal-overlay').forEach(o=>o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('open');}));
+
+// Interceptar botón Nuevo Cliente para limpiar productos
+document.querySelector('[onclick="openModal(\'m-nc\')"]')?.setAttribute('onclick','openNuevoCliente()');
+
+// ═══════════════════════════════════════════
+// TOAST
+// ═══════════════════════════════════════════
+function toast(msg,type='success'){
+  let t=document.createElement('div');
+  t.className=`toast toast-${type}`;t.textContent=msg;
+  document.body.appendChild(t);
+  setTimeout(()=>{t.style.opacity='0';setTimeout(()=>t.remove(),320);},2700);
+}
+
+// Toast especial con botón de WhatsApp — evita el bloqueo de popup del navegador
+function toastWA(msg, url, tipo='success'){
+  // Quitar toasts WA previos
+  document.querySelectorAll('.toast-wa').forEach(t=>t.remove());
+  let t=document.createElement('div');
+  t.className=`toast toast-${tipo} toast-wa`;
+  t.style.cssText='display:flex;align-items:center;gap:10px;padding:12px 16px;max-width:340px;';
+  t.innerHTML=`<span style="flex:1;font-size:13px;">${msg}</span>
+    <a href="${url}" target="_blank" rel="noopener"
+       style="background:#25D366;color:#fff;padding:7px 12px;border-radius:8px;font-size:12px;
+              font-weight:700;text-decoration:none;white-space:nowrap;flex-shrink:0;display:inline-block;">
+      💬 Enviar
+    </a>
+    <button onclick="this.parentElement.remove()" 
+            style="background:none;border:none;color:rgba(255,255,255,.7);font-size:18px;
+                   cursor:pointer;padding:0 2px;line-height:1;flex-shrink:0;">✕</button>`;
+  document.body.appendChild(t);
+  // Auto-cerrar después de 8 segundos (más tiempo para que el usuario vea el botón)
+  setTimeout(()=>{t.style.opacity='0';setTimeout(()=>t.remove(),320);},8000);
+}
+
+// ═══════════════════════════════════════════
+// ALERTA COPIA DE SEGURIDAD (cada 3 días)
+// ═══════════════════════════════════════════
+const BACKUP_KEY='eben_ultima_alerta_backup';
+const BACKUP_DIAS=3;
+
+function checkBackupReminder(){
+  const ultima=localStorage.getItem(BACKUP_KEY);
+  const ahora=Date.now();
+  const tresholdMs=BACKUP_DIAS*24*60*60*1000;
+  if(!ultima || (ahora - parseInt(ultima)) >= tresholdMs){
+    setTimeout(()=>openModal('m-backup-alert'), 800);
+  }
+}
+
+function hacerRespaltoAhora(){
+  closeModal('m-backup-alert');
+  localStorage.setItem(BACKUP_KEY, Date.now().toString());
+  exportarDatos();
+}
+
+function posponer3Dias(){
+  localStorage.setItem(BACKUP_KEY, Date.now().toString());
+  closeModal('m-backup-alert');
+  toast('⏰ Te recordaremos en 3 días hacer el respaldo','info');
+}
+
+function cerrarAlertaBackup(){
+  closeModal('m-backup-alert');
+}
+
+// ═══════════════════════════════════════════
+// DIAGNÓSTICO DE ALMACENAMIENTO
+// ═══════════════════════════════════════════
+function diagnosticarStorage(){
+  let ts=localStorage.getItem('te4_db_ts');
+  let raw=localStorage.getItem('te4_db');
+  let tamano=raw?Math.round(raw.length/1024)+' KB':'0 KB';
+  let ultimoGuardado=ts?new Date(parseInt(ts)).toLocaleString('es-CO'):'Nunca';
+  let parsed=null;try{parsed=raw?JSON.parse(raw):null;}catch(e){}
+  let clientes=parsed?.clientes?.length??0;
+  let movs=parsed?.movimientos?.length??0;
+  let liq=parsed?.liquidaciones?.length??0;
+
+  // Test de escritura
+  let puedeEscribir=false;
+  try{localStorage.setItem('__test__','1');localStorage.removeItem('__test__');puedeEscribir=true;}catch(e){}
+
+  let swActivo='serviceWorker' in navigator && navigator.serviceWorker.controller?'✅ Activo':'⚠️ Inactivo';
+
+  alert(
+    `📊 DIAGNÓSTICO DE ALMACENAMIENTO\n` +
+    `─────────────────────────────────\n` +
+    `💾 localStorage: ${puedeEscribir?'✅ Funcional':'❌ BLOQUEADO'}\n` +
+    `📅 Último guardado: ${ultimoGuardado}\n` +
+    `📦 Tamaño de datos: ${tamano}\n` +
+    `─────────────────────────────────\n` +
+    `👥 Clientes: ${clientes}\n` +
+    `📋 Movimientos: ${movs}\n` +
+    `✅ Liquidaciones: ${liq}\n` +
+    `─────────────────────────────────\n` +
+    `📱 Service Worker: ${swActivo}\n` +
+    `🌐 Origen: ${location.origin}\n` +
+    `📄 Archivo: ${location.pathname}`
+  );
+}
+
+// ═══════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════
+document.addEventListener('DOMContentLoaded',()=>{
+  // Parchear botón nuevo cliente
+  document.querySelectorAll('[onclick="openModal(\'m-nc\')"]').forEach(btn=>btn.setAttribute('onclick','openNuevoCliente()'));
+  // Set default month filter to current month
+  let pdMes=document.getElementById('pd-mes-filter');
+  if(pdMes)pdMes.value=new Date().toISOString().slice(0,7);
+  if(!load())seed();
+  renderDash();
+  _updateTopbarDeuda();
+  checkBackupReminder();
+});
+
+// ═══════════════════════════════════════════
+// TECLADO — Atajos Ctrl+Z / Ctrl+Y
+// ═══════════════════════════════════════════
+document.addEventListener('keydown',function(e){
+  if((e.ctrlKey||e.metaKey)&&!e.shiftKey&&e.key==='z'){e.preventDefault();undo();}
+  if((e.ctrlKey||e.metaKey)&&(e.key==='y'||(e.shiftKey&&e.key==='z'))){e.preventDefault();redo();}
+});
+
+// ═══════════════════════════════════════════
+// PWA — Service Worker INLINE (no depende de sw.js externo)
+// Solo cachea recursos externos (fuentes, Chart.js), NUNCA el HTML
+// ═══════════════════════════════════════════
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>{
+    // SW inline como Blob — no necesita archivo sw.js externo
+    const swCode=`
+const CACHE='eben-ezer-assets-v1';
+const ASSETS=[
+  'https://fonts.googleapis.com/css2?family=DM+Sans:wght@600;700;800&family=Inter:wght@300;400;500;600;700&display=swap',
+  'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'
+];
+self.addEventListener('install',e=>{
+  e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS).catch(()=>{})));
+  self.skipWaiting();
+});
+self.addEventListener('activate',e=>{
+  e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==CACHE).map(k=>caches.delete(k)))));
+  self.clients.claim();
+});
+self.addEventListener('fetch',e=>{
+  const url=e.request.url;
+  // NUNCA cachear el HTML principal — siempre red para tener datos frescos
+  if(url.includes(self.location.origin)||url.endsWith('.html')||url.includes('index')){
+    e.respondWith(fetch(e.request).catch(()=>caches.match(e.request)));
+    return;
+  }
+  // Para recursos externos (CDN), usar cache primero
+  e.respondWith(caches.match(e.request).then(cached=>cached||fetch(e.request).then(r=>{
+    if(r&&r.status===200){
+      let rc=r.clone();
+      caches.open(CACHE).then(c=>c.put(e.request,rc));
+    }
+    return r;
+  }).catch(()=>cached)));
+});`;
+    const blob=new Blob([swCode],{type:'application/javascript'});
+    const swUrl=URL.createObjectURL(blob);
+    navigator.serviceWorker.register(swUrl,{scope:'./'})
+      .then(reg=>{
+        console.log('[PWA] Service Worker inline activo ✓');
+        // Desregistrar SW anteriores que puedan estar cacheando el HTML
+        navigator.serviceWorker.getRegistrations().then(regs=>{
+          regs.forEach(r=>{if(r!==reg)r.unregister();});
+        });
+      })
+      .catch(err=>console.warn('[PWA] SW no disponible:',err));
+  });
+}
+
+// Banner instalación
+let deferredPrompt=null;
+window.addEventListener('beforeinstallprompt',e=>{
+  e.preventDefault();deferredPrompt=e;
+  let b=document.getElementById('pwa-install-banner');
+  if(b)b.style.display='flex';
+  document.getElementById('btn-instalar')?.style.setProperty('display','flex');
+});
+window.addEventListener('appinstalled',()=>{
+  let b=document.getElementById('pwa-install-banner');
+  if(b)b.style.display='none';
+  document.getElementById('btn-instalar')?.style.setProperty('display','none');
+  deferredPrompt=null;
+  toast('✅ App instalada correctamente');
+});
+function instalarPWA(){
+  if(deferredPrompt){
+    deferredPrompt.prompt();
+    deferredPrompt.userChoice.then(r=>{
+      if(r.outcome==='accepted')toast('✅ Instalando app...');
+      deferredPrompt=null;
+    });
+  }
+}
+function pwaCerrarBanner(){
+  let b=document.getElementById('pwa-install-banner');
+  if(b)b.style.display='none';
+}
+
+// ═══════════════════════════════════════════
+// MAIN TAB SWITCHING
+// ═══════════════════════════════════════════
+function switchMainTab(tab){
+  ['registro','reportes'].forEach(t=>{
+    document.getElementById('tab-'+t).classList.toggle('active',t===tab);
+    document.getElementById('mtab-'+t).classList.toggle('active',t===tab);
+  });
+  if(tab==='reportes') renderSubPage(curSubPage());
+  if(tab==='registro'){
+    let d=new Date();
+    document.getElementById('fecha-hoy-display').textContent=
+      d.toLocaleDateString('es-CO',{weekday:'long',day:'2-digit',month:'long',year:'numeric'}).replace(/^./,s=>s.toUpperCase());
+    // Limpiar búsquedas al volver al registro
+    _limpiarBusquedasRegistro();
+  }
+}
+
+function _limpiarBusquedasRegistro(){
+  // Limpiar agregar
+  let busAg=document.getElementById('reg-buscar-cliente');
+  if(busAg) busAg.value='';
+  let resAg=document.getElementById('reg-cli-results-agregar');
+  if(resAg) resAg.style.display='none';
+  let foundAg=document.getElementById('reg-cli-found-agregar');
+  if(foundAg) foundAg.style.display='none';
+  let formAg=document.getElementById('reg-agregar-form');
+  if(formAg) formAg.style.display='none';
+  regAgClienteId=null; regAgItems=[];
+
+  // Limpiar liquidar
+  let busLiq=document.getElementById('reg-buscar-liq');
+  if(busLiq) busLiq.value='';
+  let resLiq=document.getElementById('reg-cli-results-liq');
+  if(resLiq) resLiq.style.display='none';
+  let detLiq=document.getElementById('reg-liq-detalle');
+  if(detLiq) detLiq.style.display='none';
+
+  // Limpiar buscar general
+  let busGen=document.getElementById('reg-buscar-general');
+  if(busGen) busGen.value='';
+  let resGen=document.getElementById('reg-cli-results-general');
+  if(resGen) resGen.style.display='none';
+  let resGenDiv=document.getElementById('reg-general-result');
+  if(resGenDiv) resGenDiv.innerHTML='';
+}
+
+// ═══════════════════════════════════════════
+// SUB-PAGE (reportes)
+// ═══════════════════════════════════════════
+let _curSubPage='dashboard';
+function curSubPage(){return _curSubPage;}
+function switchSubPage(p){
+  _curSubPage=p;
+  document.querySelectorAll('.sub-page').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.sub-nav-item').forEach(x=>x.classList.remove('active'));
+  document.getElementById('sub-'+p).classList.add('active');
+  let ni=document.getElementById('snav-'+p);if(ni)ni.classList.add('active');
+  _limpiarBusquedasReportes();
+  renderSubPage(p);
+}
+function _limpiarBusquedasReportes(){
+  // Clientes
+  let cliS=document.querySelector('#sub-clientes .search-input');
+  if(cliS)cliS.value='';
+  let cliEst=document.getElementById('cli-estado-filter');
+  if(cliEst)cliEst.value='todos';
+  // Historial
+  let hS=document.getElementById('hist-search');if(hS)hS.value='';
+  let hF=document.getElementById('hist-filter');if(hF)hF.value='todos';
+  let hC=document.getElementById('hist-cliente-filter');if(hC)hC.value='';
+  let hR=document.getElementById('hist-resumen');if(hR)hR.style.display='none';
+  // Liquidaciones
+  let lS=document.getElementById('liq-search');if(lS)lS.value='';
+  let lM=document.getElementById('liq-mes-filter');if(lM)lM.value='';
+  // Productos por día
+  let pM=document.getElementById('pd-mes-filter');if(pM)pM.value='';
+  // Dashboard búsqueda rápida
+  let qI=document.getElementById('qs-input');if(qI)qI.value='';
+  let qR=document.getElementById('qs-results');if(qR)qR.style.display='none';
+  let qB=document.getElementById('qs-btn-ver');if(qB)qB.style.display='none';
+  qsSelectedId=null;
+}
+function renderSubPage(p){
+  if(p==='dashboard')renderDash();
+  else if(p==='clientes')renderCli();
+  else if(p==='historial')renderHist();
+  else if(p==='liquidaciones')renderLiq();
+  else if(p==='productos-dia')renderProdDia();
+}
+
+// Override showPage to use sub-pages when in reportes tab
+function showPage(p){switchSubPage(p);}
+
+// ═══════════════════════════════════════════
+// REGISTRO MODE SWITCHING
+// ═══════════════════════════════════════════
+function switchRegMode(mode){
+  ['nuevo','agregar','liquidar','buscar'].forEach(m=>{
+    document.getElementById('rmp-'+m).classList.toggle('active',m===mode);
+    document.getElementById('rmt-'+m).classList.toggle('active',m===mode);
+  });
+  _limpiarBusquedasRegistro();
+}
+
+// ═══════════════════════════════════════════
+// REGISTRO — NUEVO CLIENTE (inline)
+// ═══════════════════════════════════════════
+let regNcProds=[];
+function regNcAgregarProd(){
+  let p=(document.getElementById('reg-nc-pnombre').value||'').trim();
+  let q=parseInt(document.getElementById('reg-nc-pq').value)||1;
+  let v=parseFloat(document.getElementById('reg-nc-pv').value)||0;
+  if(!p){toast('⚠️ Escribe el nombre del producto','info');return;}
+  if(!v){toast('⚠️ Ingresa el valor','info');return;}
+  regNcProds.push({p,q,v,id:Date.now()+Math.random()});
+  document.getElementById('reg-nc-pnombre').value='';
+  document.getElementById('reg-nc-pq').value=1;
+  document.getElementById('reg-nc-pv').value='';
+  _renderRegNcProds();
+  setTimeout(()=>document.getElementById('reg-nc-pnombre')?.focus(),50);
+}
+function _renderRegNcProds(){
+  let lista=document.getElementById('reg-nc-prod-list');
+  let mps=document.getElementById('reg-nc-mps-list');
+  let total=regNcProds.reduce((s,x)=>s+x.q*x.v,0);
+  if(!regNcProds.length){lista.style.display='none';return;}
+  lista.style.display='block';
+  mps.innerHTML=regNcProds.map(x=>`<div class="mps-item">
+    <div class="mps-item-name">${x.p} <button onclick="regNcEditProd(${x.id})" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--ink3);padding:1px 4px;border-radius:4px;" title="Editar nombre">✏️</button></div>
+    <div class="mps-item-qty">×${x.q} · ${fmt(x.v)} c/u</div>
+    <div class="mps-item-price">${fmt(x.q*x.v)}</div>
+    <button class="pitem-remove" onclick="regNcElim(${x.id})">✕</button>
+  </div>`).join('');
+  document.getElementById('reg-nc-total-v').textContent=fmt(total);
+}
+function regNcElim(uid){regNcProds=regNcProds.filter(x=>x.id!==uid);_renderRegNcProds();}
+function regNcLimpiar(){
+  regNcProds=[];
+  _renderRegNcProds();
+  ['reg-nc-n','reg-nc-t','reg-nc-pnombre','reg-nc-pv'].forEach(id=>{let el=document.getElementById(id);if(el)el.value='';})
+  document.getElementById('reg-nc-pq').value=1;
+  document.getElementById('reg-nc-fecha').value=today();
+}
+function regCrearCliente(){
+  let nombre=(document.getElementById('reg-nc-n').value||'').trim();
+  if(!nombre){toast('⚠️ Ingresa el nombre','info');return;}
+  const CC=['#2563a8','#1a7a4a','#6b4c9a','#4a7fb5','#2980b9','#c0392b','#16a085','#8e44ad','#e67e22','#1abc9c'];
+  let newC={id:db.nci++,nombre,telefono:(document.getElementById('reg-nc-t').value||'').trim()||'—',direccion:'—',color:CC[db.clientes.length%CC.length]};
+  db.clientes.push(newC);
+  let f=document.getElementById('reg-nc-fecha')?.value||today();
+  if(regNcProds.length){
+    regNcProds.forEach(x=>{
+      db.movimientos.push({id:db.nmi++,clienteId:newC.id,producto:x.p,cantidad:x.q,valorUnit:x.v,fecha:f,pagado:false,tipo:'individual'});
+    });
+  }
+  let n=regNcProds.length;
+  let totalProd=regNcProds.reduce((s,x)=>s+x.q*x.v,0);
+  save(`Nuevo cliente: ${nombre}`);
+  regNcLimpiar();
+  _updateTopbarDeuda();
+  toast(`✓ ${nombre} registrado${n>0?` con ${n} producto${n!==1?'s':''} — ${fmt(totalProd)}`:''}`);
+}
+
+// ═══════════════════════════════════════════
+// REGISTRO — BUSCAR CLIENTE (agregar y liquidar)
+// ═══════════════════════════════════════════
+let regAgClienteId=null;
+let regAgItems=[];
+
+function regBuscarCliente(v){
+  let res=document.getElementById('reg-cli-results-agregar');
+  if(!v||v.length<2){res.style.display='none';return;}
+  let matches=db.clientes.filter(c=>c.nombre.toLowerCase().includes(v.toLowerCase())||c.telefono.includes(v));
+  if(!matches.length){res.innerHTML='<div class="qs-result-item" style="color:var(--muted)">Sin resultados</div>';res.style.display='block';return;}
+  res.innerHTML=matches.map(c=>{let d=deuda(c.id);return`<div class="qs-result-item" onclick="regSeleccionarAgregar(${c.id})">
+    <div class="avatar" style="background:${c.color}22;color:${c.color};font-size:10px;margin:0;">${ini(c.nombre)}</div>
+    <div style="flex:1"><div class="qs-result-name">${c.nombre}</div><div class="qs-result-meta">📞 ${c.telefono}</div></div>
+    <div class="qs-result-debt" style="color:${d>0?'var(--accent)':'var(--green)'}">${fmt(d)}</div>
+  </div>`;}).join('');
+  res.style.display='block';
+}
+function regSeleccionarAgregar(id){
+  let c=db.clientes.find(x=>x.id===id);if(!c)return;
+  regAgClienteId=id;regAgItems=[];
+  document.getElementById('reg-buscar-cliente').value=c.nombre;
+  document.getElementById('reg-cli-results-agregar').style.display='none';
+  let found=document.getElementById('reg-cli-found-agregar');
+  found.style.display='flex';
+  document.getElementById('reg-cli-av-agregar').textContent=ini(c.nombre);
+  document.getElementById('reg-cli-av-agregar').style.cssText=`background:${c.color}22;color:${c.color};font-size:12px;width:42px;height:42px;`;
+  document.getElementById('reg-cli-name-agregar').textContent=c.nombre;
+  document.getElementById('reg-cli-meta-agregar').textContent='📞 '+c.telefono;
+  document.getElementById('reg-cli-deuda-agregar').textContent=fmt(deuda(id));
+  document.getElementById('reg-agregar-form').style.display='block';
+  document.getElementById('reg-ag-fecha').value=today();
+  document.getElementById('reg-ag-liq-btn').style.display=deuda(id)>0?'inline-flex':'none';
+  document.getElementById('reg-ag-wa-btn').style.display=deuda(id)>0?'inline-flex':'none';
+  _renderRegAgList();
+}
+function regLimpiarClienteAgregar(){
+  regAgClienteId=null;regAgItems=[];
+  document.getElementById('reg-buscar-cliente').value='';
+  document.getElementById('reg-cli-found-agregar').style.display='none';
+  document.getElementById('reg-agregar-form').style.display='none';
+  _renderRegAgList();
+}
+function regAgPrev(){
+  let q=parseFloat(document.getElementById('reg-ag-nq')?.value)||0;
+  let v=parseFloat(document.getElementById('reg-ag-nv')?.value)||0;
+  let el=document.getElementById('reg-ag-prev');
+  if(el){if(q*v>0){el.style.display='block';el.textContent='Subtotal: '+fmt(q*v);}else el.style.display='none';}
+}
+function regAgAgregar(){regAgAnadirALista();}
+function regAgAnadirALista(){
+  let p=(document.getElementById('reg-ag-np')?.value||'').trim();
+  let q=parseInt(document.getElementById('reg-ag-nq')?.value)||1;
+  let v=parseFloat(document.getElementById('reg-ag-nv')?.value)||0;
+  if(!p){toast('⚠️ Escribe el nombre del producto','info');return;}
+  if(!v){toast('⚠️ Ingresa el valor','info');return;}
+  regAgItems.push({p,q,v,id:Date.now()+Math.random()});
+  document.getElementById('reg-ag-np').value='';
+  document.getElementById('reg-ag-nq').value=1;
+  document.getElementById('reg-ag-nv').value='';
+  document.getElementById('reg-ag-prev').style.display='none';
+  _renderRegAgList();
+  let n=regAgItems.length;
+  toast(`✓ "${p}" añadido — ${n} producto${n!==1?'s':''} en la lista`,'info');
+  setTimeout(()=>document.getElementById('reg-ag-np')?.focus(),50);
+}
+function regAgLimpiarLista(){
+  if(!regAgItems.length)return;
+  regAgItems=[];
+  _renderRegAgList();
+  toast('🗑️ Lista limpiada','info');
+}
+function _renderRegAgList(){
+  let wrap=document.getElementById('reg-ag-list-wrap');
+  let list=document.getElementById('reg-ag-list');
+  let total=regAgItems.reduce((s,x)=>s+x.q*x.v,0);
+  if(!regAgItems.length){if(wrap)wrap.style.display='none';return;}
+  if(wrap)wrap.style.display='block';
+  let lbl=document.getElementById('reg-ag-list-label');
+  if(lbl)lbl.textContent=`Lista de productos a guardar (${regAgItems.length})`;
+  list.innerHTML=regAgItems.map((x,i)=>`<div class="mps-item">
+    <div class="mps-item-qty" style="color:var(--ink3);font-size:10px;min-width:18px;">${i+1}.</div>
+    <div class="mps-item-name">${x.p} <button onclick="regAgEditProd(${x.id})" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--ink3);padding:1px 4px;border-radius:4px;" title="Editar nombre">✏️</button></div>
+    <div class="mps-item-qty">×${x.q} · ${fmt(x.v)} c/u</div>
+    <div class="mps-item-price">${fmt(x.q*x.v)}</div>
+    <button class="pitem-remove" onclick="regAgElim(${x.id})">✕</button>
+  </div>`).join('');
+  document.getElementById('reg-ag-total-v').textContent=fmt(total);
+}
+function regAgElim(uid){regAgItems=regAgItems.filter(x=>x.id!==uid);_renderRegAgList();}
+function regAgGuardar(){
+  if(!regAgClienteId){toast('⚠️ Selecciona un cliente','info');return;}
+  if(!regAgItems.length){toast('⚠️ Añade al menos un producto a la lista','info');return;}
+  let f=document.getElementById('reg-ag-fecha')?.value||today();
+  let dt=f+'T'+new Date().toTimeString().slice(0,5);
+  regAgItems.forEach(x=>{
+    db.movimientos.push({id:db.nmi++,clienteId:regAgClienteId,producto:x.p,cantidad:x.q,valorUnit:x.v,fecha:dt,pagado:false,tipo:'individual'});
+  });
+  let c=db.clientes.find(x=>x.id===regAgClienteId);
+  let n=regAgItems.length;
+  let total=regAgItems.reduce((s,x)=>s+x.q*x.v,0);
+  regAgItems=[];
+  save(`Agregar ${n} producto${n!==1?'s':''} a ${c?.nombre||''}`);
+  document.getElementById('reg-cli-deuda-agregar').textContent=fmt(deuda(regAgClienteId));
+  document.getElementById('reg-ag-liq-btn').style.display=deuda(regAgClienteId)>0?'inline-flex':'none';
+  document.getElementById('reg-ag-wa-btn').style.display=deuda(regAgClienteId)>0?'inline-flex':'none';
+  _renderRegAgList();
+  toast(`✓ ${n} producto${n!==1?'s':''} guardado${n!==1?'s':''} para ${c?.nombre} — ${fmt(total)}`);
+  setTimeout(()=>document.getElementById('reg-ag-np')?.focus(),80);
+}
+
+// GUARDAR DIRECTO (sin pasar por lista temporal)
+function regAgGuardarDirecto(){
+  if(!regAgClienteId){toast('⚠️ Selecciona un cliente','info');return;}
+  let p=(document.getElementById('reg-ag-np')?.value||'').trim();
+  let q=parseInt(document.getElementById('reg-ag-nq')?.value)||1;
+  let v=parseFloat(document.getElementById('reg-ag-nv')?.value)||0;
+  if(!p){toast('⚠️ Escribe el nombre del producto','info');return;}
+  if(!v){toast('⚠️ Ingresa el valor','info');return;}
+  let f=document.getElementById('reg-ag-fecha')?.value||today();
+  let dt=f+'T'+new Date().toTimeString().slice(0,5);
+  let c=db.clientes.find(x=>x.id===regAgClienteId);
+  db.movimientos.push({id:db.nmi++,clienteId:regAgClienteId,producto:p,cantidad:q,valorUnit:v,fecha:dt,pagado:false,tipo:'individual'});
+  save(`"${p}" a ${c?.nombre||''}`);
+  document.getElementById('reg-ag-np').value='';
+  document.getElementById('reg-ag-nq').value=1;
+  document.getElementById('reg-ag-nv').value='';
+  document.getElementById('reg-ag-prev').style.display='none';
+  document.getElementById('reg-cli-deuda-agregar').textContent=fmt(deuda(regAgClienteId));
+  document.getElementById('reg-ag-liq-btn').style.display=deuda(regAgClienteId)>0?'inline-flex':'none';
+  document.getElementById('reg-ag-wa-btn').style.display=deuda(regAgClienteId)>0?'inline-flex':'none';
+  toast(`✓ "${p}" guardado para ${c?.nombre} — ${fmt(q*v)}`);
+  setTimeout(()=>document.getElementById('reg-ag-np')?.focus(),60);
+}
+
+function regNcGuardarDirecto(){
+  let nombre=(document.getElementById('reg-nc-n').value||'').trim();
+  let p=(document.getElementById('reg-nc-pnombre')?.value||'').trim();
+  let q=parseInt(document.getElementById('reg-nc-pq')?.value)||1;
+  let v=parseFloat(document.getElementById('reg-nc-pv')?.value)||0;
+  // If nombre is empty, just add to list
+  if(!p&&!v){toast('⚠️ Escribe el producto y valor','info');return;}
+  if(!p){toast('⚠️ Escribe el nombre del producto','info');return;}
+  if(!v){toast('⚠️ Ingresa el valor','info');return;}
+  // If cliente already exists (nombre filled), save directly
+  if(nombre){
+    let existC=db.clientes.find(c=>c.nombre.toLowerCase()===nombre.toLowerCase());
+    if(existC){
+      let f=document.getElementById('reg-nc-fecha')?.value||today();
+      let dt=f+'T'+new Date().toTimeString().slice(0,5);
+      db.movimientos.push({id:db.nmi++,clienteId:existC.id,producto:p,cantidad:q,valorUnit:v,fecha:dt,pagado:false,tipo:'individual'});
+      save(`"${p}" a ${existC.nombre}`);
+      document.getElementById('reg-nc-pnombre').value='';
+      document.getElementById('reg-nc-pq').value=1;
+      document.getElementById('reg-nc-pv').value='';
+      toast(`✓ "${p}" guardado para ${existC.nombre} — ${fmt(q*v)}`);
+      return;
+    }
+  }
+  // Otherwise add to temp list
+  regNcProds.push({p,q,v,id:Date.now()+Math.random()});
+  document.getElementById('reg-nc-pnombre').value='';
+  document.getElementById('reg-nc-pq').value=1;
+  document.getElementById('reg-nc-pv').value='';
+  _renderRegNcProds();
+  toast(`✓ "${p}" en lista — guarda el cliente para confirmar`);
+  setTimeout(()=>document.getElementById('reg-nc-pnombre')?.focus(),50);
+}
+
+function ncAgregarProdGuardar(){
+  let p=(document.getElementById('nc-pnombre').value||'').trim();
+  let q=parseInt(document.getElementById('nc-pq').value)||1;
+  let v=parseFloat(document.getElementById('nc-pv').value)||0;
+  if(!p){toast('⚠️ Escribe el nombre del producto','info');return;}
+  if(!v){toast('⚠️ Ingresa el valor','info');return;}
+  ncProds.push({p,q,v,id:Date.now()+Math.random()});
+  document.getElementById('nc-pnombre').value='';
+  document.getElementById('nc-pq').value=1;
+  document.getElementById('nc-pv').value='';
+  _renderNcProds();
+  toast(`✓ "${p}" agregado a la lista`);
+  setTimeout(()=>document.getElementById('nc-pnombre')?.focus(),50);
+}
+
+function detGuardarDirecto(){
+  let p=(document.getElementById('det-np')?.value||'').trim();
+  let q=parseInt(document.getElementById('det-nq')?.value)||1;
+  let v=parseFloat(document.getElementById('det-nv')?.value)||0;
+  if(!p){toast('⚠️ Escribe el nombre del producto','info');return;}
+  if(!v){toast('⚠️ Ingresa el valor','info');return;}
+  let f=document.getElementById('det-fecha')?.value||today();
+  let dt=f+'T'+new Date().toTimeString().slice(0,5);
+  db.movimientos.push({id:db.nmi++,clienteId:detClienteId,producto:p,cantidad:q,valorUnit:v,fecha:dt,pagado:false,tipo:'individual'});
+  save(`"${p}" agregado`);
+  document.getElementById('det-np').value='';
+  document.getElementById('det-nq').value=1;
+  document.getElementById('det-nv').value='';
+  _renderDetalle();
+  refreshAll();
+  toast(`✓ "${p}" guardado — ${fmt(q*v)}`);
+  setTimeout(()=>document.getElementById('det-np')?.focus(),50);
+}
+function regBuscarKey(e,mode){
+  if(e.key==='Escape'){document.getElementById('reg-cli-results-'+(mode==='agregar'?'agregar':'liq')).style.display='none';}
+}
+
+// Buscar para liquidar
+let regLiqClienteId=null;
+function regBuscarClienteLiq(v){
+  let res=document.getElementById('reg-cli-results-liq');
+  if(!v||v.length<2){res.style.display='none';return;}
+  let matches=db.clientes.filter(c=>c.nombre.toLowerCase().includes(v.toLowerCase())||c.telefono.includes(v));
+  if(!matches.length){res.innerHTML='<div class="qs-result-item" style="color:var(--muted)">Sin resultados</div>';res.style.display='block';return;}
+  res.innerHTML=matches.filter(c=>deuda(c.id)>0).map(c=>{let d=deuda(c.id);return`<div class="qs-result-item" onclick="regSeleccionarLiq(${c.id})">
+    <div class="avatar" style="background:${c.color}22;color:${c.color};font-size:10px;margin:0;">${ini(c.nombre)}</div>
+    <div style="flex:1"><div class="qs-result-name">${c.nombre}</div><div class="qs-result-meta">📞 ${c.telefono}</div></div>
+    <div class="qs-result-debt" style="color:var(--accent)">${fmt(d)}</div>
+  </div>`;}).join('')||'<div class="qs-result-item" style="color:var(--muted)">Sin clientes con deuda pendiente</div>';
+  res.style.display='block';
+}
+function regSeleccionarLiq(id){
+  regLiqClienteId=id;
+  let c=db.clientes.find(x=>x.id===id);
+  document.getElementById('reg-buscar-liq').value=c.nombre;
+  document.getElementById('reg-cli-results-liq').style.display='none';
+  _renderRegLiqDetalle(id);
+}
+function _renderRegLiqDetalle(id){
+  let c=db.clientes.find(x=>x.id===id),movs=activos(id),total=deuda(id);
+  let det=document.getElementById('reg-liq-detalle');
+  if(!movs.length){
+    let up=ultimoPago(id);
+    det.style.display='block';
+    det.innerHTML='<div class="empty-state" style="color:var(--green)">✅ Este cliente no tiene deuda pendiente'+(up?'<div style=\"font-size:12px;color:var(--muted);margin-top:6px;\">💚 Último pago: '+fmtFechaHora(up)+'</div>':'')+'</div>';
+    return;
+  }
+  let items=movs.map((m,i)=>`<div class="pitem">
+    <div style="margin-right:6px;"><input type="checkbox" id="chk-mov-${m.id}" style="width:auto;margin:0;" checked></div>
+    <div class="info"><div class="name">${m.producto} <button onclick="editarNombreProducto(${m.id})" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--ink3);padding:1px 4px;border-radius:4px;" title="Editar nombre">✏️</button></div><div class="meta">📅 ${fmtFechaHora(m.fecha)} &nbsp;·&nbsp; ×${m.cantidad} und &nbsp;·&nbsp; ${fmt(m.valorUnit)} c/u</div></div>
+    <div class="price">${fmt(m.valorUnit*m.cantidad)}</div>
+    <button class="btn btn-xs btn-ghost" onclick="abonarDeudaIndividual(${id},${m.id})" title="Abonar solo esta deuda">💳</button>
+  </div>`).join('');
+  det.style.display='block';
+  det.innerHTML=`
+    <div class="cli-found-card" style="margin-bottom:12px;">
+      <div class="avatar" style="background:${c.color}22;color:${c.color};font-size:12px;width:42px;height:42px;">${ini(c.nombre)}</div>
+      <div><div class="cfc-name">${c.nombre}</div><div class="cfc-meta">📞 ${c.telefono}</div></div>
+      <div class="cfc-deuda">${fmt(total)}</div>
+      <button class="btn btn-xs btn-ghost" onclick="document.getElementById('reg-buscar-liq').value='';document.getElementById('reg-liq-detalle').style.display='none';">✕</button>
+    </div>
+    <div class="slabel">Productos pendientes — 💳 toca el ícono para abonar por deuda (${movs.length})</div>
+    <div class="product-list-modal">${items}</div>
+    <div class="total-row"><span class="label">💰 Total a Cobrar</span><span class="amount">${fmt(total)}</span></div>
+    <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:11px 13px;margin:10px 0;">
+      <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">💳 Abono Parcial (opcional)</div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <input class="form-input" id="reg-liq-abono-val" type="number" min="0" max="${total}" placeholder="Valor del abono $" style="max-width:200px;" oninput="regLiqPrevAbono(${total})">
+        <span style="font-size:12px;color:var(--muted)">Deja vacío para pago total</span>
+      </div>
+      <div id="reg-liq-abono-prev" style="display:none;margin-top:6px;font-size:12px;color:var(--accent);font-weight:700;"></div>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-ghost" onclick="imprimirCuenta(${id})">📄 PDF</button>
+      <button class="btn btn-ghost" style="background:#25D366;color:#fff;border:none;" onclick="enviarWhatsApp(${id},'liquidar')">💬 Cobrar WA</button>
+      <button class="btn btn-warning" onclick="(function(){let v=parseFloat(document.getElementById('reg-liq-abono-val')?.value)||0;if(!v||v<=0){toast('⚠️ Ingresa el valor del abono','info');return;}let c=db.clientes.find(x=>x.id===${id});let s=${total}-v;pedirConfirmAbono(c?.nombre||'',v,s,function(){regConfirmarAbono(${id},${total})});})()">💰 Abono Parcial</button>
+      <button class="btn btn-success" onclick="pedirConfirmPagoTotal(${id},${total},${movs.length},function(){regConfirmarLiq(${id},${total},${movs.length})})">✓ Pago Total</button>
+    </div>`;
+}
+
+function regLiqPrevAbono(total){
+  let v=parseFloat(document.getElementById('reg-liq-abono-val')?.value)||0;
+  let el=document.getElementById('reg-liq-abono-prev');
+  if(!el)return;
+  if(v>0&&v<total){el.style.display='block';el.textContent='Abono: '+fmt(v)+' — Saldo: '+fmt(total-v);}
+  else if(v>=total){el.style.display='block';el.textContent='⚠️ Cubre deuda total. Usa "Pago Total".';}
+  else el.style.display='none';
+}
+
+function regConfirmarAbono(id,total){
+  let abono=parseFloat(document.getElementById('reg-liq-abono-val')?.value)||0;
+  if(!abono||abono<=0){toast('⚠️ Ingresa el valor del abono','info');return;}
+  if(abono>=total){if(!confirm('El abono cubre la deuda total. ¿Liquidar completamente?'))return;regConfirmarLiq(id,total,activos(id).length);return;}
+  let c=db.clientes.find(x=>x.id===id);
+  // Descontar el abono de los movimientos activos (del más antiguo al más nuevo)
+  let movsPend=db.movimientos.filter(m=>m.clienteId===id&&!m.pagado).sort((a,b)=>new Date(a.fecha)-new Date(b.fecha));
+  let restante=abono;
+  let detalle=[];
+  for(let m of movsPend){
+    if(restante<=0)break;
+    let subtotal=m.valorUnit*m.cantidad;
+    if(restante>=subtotal){
+      m.pagado=true;
+      detalle.push({producto:m.producto,cantidad:m.cantidad,valorUnit:m.valorUnit,fecha:m.fecha});
+      restante-=subtotal;
+    } else {
+      let pagoParcial=restante;
+      let nuevoTotal=subtotal-pagoParcial;
+      m.valorUnit=nuevoTotal/m.cantidad;
+      detalle.push({producto:m.producto+' (abono)',cantidad:m.cantidad,valorUnit:pagoParcial/m.cantidad,fecha:m.fecha});
+      restante=0;
+    }
+  }
+  let saldo=deuda(id);
+  db.liquidaciones.push({id:db.nli++,clienteId:id,fecha:nowDateTime(),valor:abono,productos:detalle.length,detalle,notas:'Abono parcial',tipo:'abono'});
+  save(`Abono parcial ${c.nombre}: ${fmt(abono)}`);
+  document.getElementById('reg-buscar-liq').value='';
+  document.getElementById('reg-liq-detalle').style.display='none';
+  _regLiqClienteId=null;
+  refreshAll();
+  toast(`✓ Abono ${fmt(abono)} para ${c.nombre} — Saldo: ${fmt(saldo)}`);
+  let tel=formatearTelefono(c.telefono);
+  if(tel){
+    let fechaStr=new Date().toLocaleDateString('es-CO',{day:'2-digit',month:'long',year:'numeric'})+' '+new Date().toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'});
+    let msg=`*COMPROBANTE DE ABONO PARCIAL*\nTienda Eben-ezer\n\nHola ${c.nombre.split(' ')[0]}, registramos tu abono:\n\n*Abono recibido:* ${fmt(abono)}\n*Saldo pendiente:* ${fmt(saldo)}\n*Fecha:* ${fechaStr}\n\n🙏 _Tienda Eben-ezer_`;
+    toastWA('✓ Abono registrado — ¿enviar comprobante?','https://wa.me/'+tel+'?text='+encodeURIComponent(msg));
+  }
+}
+
+function abonarDeudaIndividual(clienteId,movId){
+  let c=db.clientes.find(x=>x.id===clienteId);
+  let m=db.movimientos.find(x=>x.id===movId);
+  if(!c||!m)return;
+  let valTotal=m.valorUnit*m.cantidad;
+  let body=document.getElementById('abono-deuda-body');
+  body.innerHTML=`
+    <div class="cmh" style="margin-bottom:12px;">
+      <div class="avatar-lg" style="background:${c.color}22;color:${c.color}">${ini(c.nombre)}</div>
+      <div><div class="cmh-name">${c.nombre}</div><div class="cmh-meta">Abono a deuda específica</div></div>
+    </div>
+    <div class="orden-detail" style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:12px;margin-bottom:12px;">
+      <div style="font-weight:700;font-size:14px;margin-bottom:4px;">📦 ${m.producto}</div>
+      <div style="font-size:12px;color:var(--muted);">📅 ${fmtFechaHora(m.fecha)} &nbsp;·&nbsp; ×${m.cantidad} und &nbsp;·&nbsp; ${fmt(m.valorUnit)} c/u</div>
+      <div style="font-size:15px;font-weight:800;color:var(--accent);margin-top:6px;">Total: ${fmt(valTotal)}</div>
+    </div>
+    <div class="form-group"><label class="form-label">Valor del abono ($)</label>
+      <input class="form-input" id="abd-valor" type="number" min="1" max="${valTotal}" placeholder="Valor a abonar" oninput="abdPrev(${valTotal})">
+    </div>
+    <div id="abd-prev" style="display:none;margin:6px 0;font-size:12px;color:var(--accent);font-weight:700;"></div>
+    <div class="form-actions">
+      <button class="btn btn-ghost" onclick="closeModal('m-abono-deuda')">Cancelar</button>
+      <button class="btn btn-warning" onclick="(function(){let v=parseFloat(document.getElementById('abd-valor')?.value)||0;if(!v||v<=0){toast('⚠️ Ingresa el valor','info');return;}let c=db.clientes.find(x=>x.id===${clienteId});let s=${valTotal}-v;pedirConfirmAbono(c?.nombre||'',v,s,function(){confirmarAbonoDeuda(${clienteId},${movId},${valTotal},false)});})()">💰 Abono Parcial</button>
+      <button class="btn btn-success" onclick="pedirConfirmPagoTotal(${clienteId},${valTotal},1,function(){confirmarAbonoDeuda(${clienteId},${movId},${valTotal},true)})">✓ Pagar Completo</button>
+    </div>`;
+  closeModal('m-det');
+  openModal('m-abono-deuda');
+}
+
+function abdPrev(total){
+  let v=parseFloat(document.getElementById('abd-valor')?.value)||0;
+  let el=document.getElementById('abd-prev');
+  if(!el)return;
+  if(v>0&&v<total){el.style.display='block';el.textContent='Abono: '+fmt(v)+' — Saldo de esta deuda: '+fmt(total-v);}
+  else el.style.display='none';
+}
+
+function confirmarAbonoDeuda(clienteId,movId,valTotal,completo){
+  let c=db.clientes.find(x=>x.id===clienteId);
+  let m=db.movimientos.find(x=>x.id===movId);
+  if(!c||!m)return;
+  let abono=completo?valTotal:(parseFloat(document.getElementById('abd-valor')?.value)||0);
+  if(!abono||abono<=0){toast('⚠️ Ingresa el valor','info');return;}
+  let saldo=valTotal-abono;
+  if(completo||abono>=valTotal){
+    m.pagado=true;
+    db.liquidaciones.push({id:db.nli++,clienteId,fecha:nowDateTime(),valor:valTotal,productos:1,detalle:[{producto:m.producto,cantidad:m.cantidad,valorUnit:m.valorUnit,fecha:m.fecha}],notas:'Pago individual',tipo:'individual'});
+    toast(`✓ "${m.producto}" pagado completo — ${fmt(valTotal)}`);
+  } else {
+    // Reducir el valorUnit del movimiento para reflejar el saldo real
+    let nuevoTotal=valTotal-abono;
+    m.valorUnit=nuevoTotal/m.cantidad;
+    db.liquidaciones.push({id:db.nli++,clienteId,fecha:nowDateTime(),valor:abono,productos:0,detalle:[{producto:m.producto,cantidad:m.cantidad,valorUnit:m.valorUnit,fecha:m.fecha}],notas:`Abono parcial a: ${m.producto}`,tipo:'abono'});
+    toast(`✓ Abono ${fmt(abono)} para "${m.producto}" — Saldo: ${fmt(Math.max(0,saldo))}`);
+  }
+  save(`Abono a deuda de ${c.nombre}`);
+  closeModal('m-abono-deuda');
+  refreshAll();
+  let tel=formatearTelefono(c.telefono);
+  if(tel){
+    let fechaStr=new Date().toLocaleDateString('es-CO',{day:'2-digit',month:'long',year:'numeric'})+' '+new Date().toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'});
+    let tipoMsg=completo||abono>=valTotal?'PAGO COMPLETO':'ABONO PARCIAL';
+    let saldoMsg=completo||abono>=valTotal?'¡Deuda cancelada! ✅':'Saldo pendiente de esta deuda: '+fmt(Math.max(0,saldo));
+    // Sin número Nequi en comprobante de abono; en pago total sí se incluye
+    let extraInfo='';
+    // Nequi no se muestra en comprobantes de pago
+    let msg=`*COMPROBANTE DE ${tipoMsg}*\nTienda Eben-ezer\n\nHola ${c.nombre.split(' ')[0]}:\n\n*Producto:* ${m.producto}\n*Valor pagado:* ${fmt(abono)}\n${saldoMsg}\n*Fecha:* ${fechaStr}${extraInfo}\n\n🙏 _Gracias por tu pago — Tienda Eben-ezer_`;
+    toastWA('✓ Pago registrado — ¿enviar comprobante?','https://wa.me/'+tel+'?text='+encodeURIComponent(msg));
+  }
+}
+function regConfirmarLiq(id,total,numProductos){
+  let c=db.clientes.find(x=>x.id===id);
+  let movsPagados=db.movimientos.filter(m=>m.clienteId===id&&!m.pagado);
+  let detallePagado=movsPagados.map(m=>({producto:m.producto,cantidad:m.cantidad,valorUnit:m.valorUnit,fecha:m.fecha}));
+  movsPagados.forEach(m=>m.pagado=true);
+  let fechaLiq=nowDateTime();
+  db.liquidaciones.push({id:db.nli++,clienteId:id,fecha:fechaLiq,valor:total,productos:numProductos,detalle:detallePagado,notas:'',tipo:'total'});
+  save(`Liquidar cuenta de ${c.nombre}`);
+  document.getElementById('reg-buscar-liq').value='';
+  document.getElementById('reg-liq-detalle').style.display='none';
+  toast(`✓ Cuenta de ${c.nombre} liquidada — ${fmt(total)}`);
+  let tel=formatearTelefono(c.telefono);
+  if(tel){
+    let lista=detallePagado.map(p=>`• ${p.producto}${p.cantidad>1?' ×'+p.cantidad:''} = ${fmt(p.valorUnit*p.cantidad)}`).join('\n');
+    let fechaStr=new Date().toLocaleDateString('es-CO',{day:'2-digit',month:'long',year:'numeric'})+' '+new Date().toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'});
+    let msg=`*COMPROBANTE DE PAGO TOTAL*\nTienda Eben-ezer\n\nHola ${c.nombre.split(' ')[0]}, confirmamos el pago total:\n\n*Productos pagados:*\n${lista}\n\n*Total cancelado: ${fmt(total)}*\n*Fecha:* ${fechaStr}\n\nGracias por tu pago.`;
+    toastWA('✓ Cuenta liquidada — ¿enviar comprobante?','https://wa.me/'+tel+'?text='+encodeURIComponent(msg));
+  }
+}
+
+// Buscar general
+function regBuscarGeneral(v){
+  let res=document.getElementById('reg-cli-results-general');
+  let resDiv=document.getElementById('reg-general-result');
+  if(!v||v.length<2){res.style.display='none';resDiv.innerHTML='';return;}
+  let matches=db.clientes.filter(c=>c.nombre.toLowerCase().includes(v.toLowerCase())||c.telefono.includes(v));
+  if(!matches.length){res.innerHTML='<div class="qs-result-item" style="color:var(--muted)">Sin resultados</div>';res.style.display='block';resDiv.innerHTML='';return;}
+  res.innerHTML=matches.map(c=>{let d=deuda(c.id);return`<div class="qs-result-item" onclick="regMostrarGeneral(${c.id})">
+    <div class="avatar" style="background:${c.color}22;color:${c.color};font-size:10px;margin:0;">${ini(c.nombre)}</div>
+    <div style="flex:1"><div class="qs-result-name">${c.nombre}</div><div class="qs-result-meta">📞 ${c.telefono}</div></div>
+    <div class="qs-result-debt" style="color:${d>0?'var(--accent)':'var(--green)'}">${fmt(d)}</div>
+  </div>`;}).join('');
+  res.style.display='block';
+}
+function regMostrarGeneral(id){
+  let c=db.clientes.find(x=>x.id===id);
+  let d=deuda(id);let movs=activos(id);
+  document.getElementById('reg-buscar-general').value=c.nombre;
+  document.getElementById('reg-cli-results-general').style.display='none';
+  let items=movs.map(m=>`<div class="pitem"><div class="info"><div class="name">${m.producto} <button onclick="editarNombreProducto(${m.id})" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--ink3);padding:1px 4px;border-radius:4px;" title="Editar nombre">✏️</button></div><div class="meta">📅 ${fmtFechaHora(m.fecha)} &nbsp;·&nbsp; ×${m.cantidad} &nbsp;·&nbsp; ${fmt(m.valorUnit)} c/u</div></div><div class="price">${fmt(m.valorUnit*m.cantidad)}</div></div>`).join('');
+  document.getElementById('reg-general-result').innerHTML=`
+    <div class="cli-found-card" style="margin-bottom:12px;">
+      <div class="avatar" style="background:${c.color}22;color:${c.color};font-size:12px;width:42px;height:42px;">${ini(c.nombre)}</div>
+      <div><div class="cfc-name">${c.nombre}</div><div class="cfc-meta">📞 ${c.telefono}</div></div>
+      <div class="cfc-deuda" style="color:${d>0?'var(--accent)':'var(--green)'}">${fmt(d)}</div>
+    </div>
+    ${movs.length?`<div class="slabel">Pendiente (${movs.length})</div><div class="product-list-modal">${items}</div>`:`<div style='color:var(--green);text-align:center;padding:12px;font-size:14px;'>✅ Sin deuda pendiente</div>${ultimoPago(id)?`<div style='color:var(--muted);text-align:center;font-size:12px;padding:4px 0 8px;'>💚 Último pago: ${fmtFechaHora(ultimoPago(id))}</div>`:''}`}
+    <div class="form-actions">
+      <button class="btn btn-ghost btn-sm" onclick="verDetalle(${id})">📋 Ver Cuenta Completa</button>
+      ${d>0?`<button class="btn btn-success btn-sm" onclick="liquidar(${id})">✓ Liquidar</button>`:''}
+    </div>`;
+}
+
+// Close dropdowns on outside click
+document.addEventListener('click',function(e){
+  if(!e.target.closest('.cli-search-box')){
+    document.querySelectorAll('.cli-results-drop').forEach(r=>r.style.display='none');
+  }
+});
+
+// ═══════════════════════════════════════════
+// INIT extras
+// ═══════════════════════════════════════════
+document.addEventListener('DOMContentLoaded',()=>{
+  // Fecha hoy
+  let d=new Date();
+  let fh=document.getElementById('fecha-hoy-display');
+  if(fh) fh.textContent=d.toLocaleDateString('es-CO',{weekday:'long',day:'2-digit',month:'long',year:'numeric'}).replace(/^./,s=>s.toUpperCase());
+  // Init reg-nc-fecha
+  let regFecha=document.getElementById('reg-nc-fecha');
+  if(regFecha)regFecha.value=today();
+});
+
+</script>
+<!-- Banner instalación PWA -->
+<div id="pwa-install-banner" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:9999;background:#1a1814;color:#fff;padding:14px 18px;align-items:center;gap:12px;box-shadow:0 -4px 20px rgba(0,0,0,.35);border-top:2px solid #1c4f3c;">
+  <div style="font-size:26px;">🏪</div>
+  <div style="flex:1;">
+    <div style="font-weight:800;font-size:13px;font-family:'DM Sans',sans-serif;">Instalar Tienda Eben-ezer</div>
+    <div style="font-size:11px;color:rgba(255,255,255,.55);margin-top:2px;">Instala el app para usarla sin internet</div>
+  </div>
+  <button onclick="instalarPWA()" style="background:#1c4f3c;color:#fff;border:none;border-radius:8px;padding:9px 16px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Inter',sans-serif;white-space:nowrap;">📲 Instalar</button>
+  <button onclick="pwaCerrarBanner()" style="background:rgba(255,255,255,.1);color:rgba(255,255,255,.6);border:none;border-radius:8px;padding:9px 12px;font-size:12px;cursor:pointer;">✕</button>
+</div>
+</body>
+</html>
