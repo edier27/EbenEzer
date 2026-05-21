@@ -1025,12 +1025,23 @@ function _initFirebaseSync(){
     // Solo sincronizar si Firebase tiene datos MÁS recientes
     var fbTs = fbData.updatedAt ? new Date(fbData.updatedAt).getTime() : 0;
     if(fbTs <= _lastLocalSaveTs) return;
-    // Protección extra: no aplicar si Firebase tiene MENOS clientes que local
+    // Protección máxima: no aplicar si Firebase tiene menos registros que local
     if(fbData.appData){
       try{
         var testParsed = JSON.parse(fbData.appData);
-        if(testParsed && Array.isArray(testParsed.clientes) &&
-           testParsed.clientes.length < db.clientes.length) return;
+        if(testParsed && Array.isArray(testParsed.clientes)){
+          // Rechazar si Firebase tiene menos clientes O menos movimientos
+          if(testParsed.clientes.length < db.clientes.length) {
+            console.warn('[SYNC] Firebase tiene menos clientes — ignorado');
+            return;
+          }
+          var fbMovs = (testParsed.movimientos||[]).length;
+          var localMovs = (db.movimientos||[]).length;
+          if(fbMovs < localMovs) {
+            console.warn('[SYNC] Firebase tiene menos movimientos — ignorado');
+            return;
+          }
+        }
       }catch(e){ return; }
     }
     // Aplicar datos de Firebase (vienen de otro dispositivo)
@@ -1110,28 +1121,12 @@ function load(){
 // SEED
 // ═══════════════════════════════════════════
 function seed(){
-  // PROTECCIÓN: si ya hay datos, no sembrar demo
-  if(db.clientes && db.clientes.length > 0){
-    console.warn('[SEED] Protegido — ya hay datos, no se sobreescribe');
-    return;
-  }
-  const CC=['#2563a8','#1a7a4a','#6b4c9a','#4a7fb5','#2980b9','#c0392b','#16a085'];
-  const CL=[{nombre:'María García',telefono:'310 555 1234',direccion:'Calle 10 # 5-20'},
-    {nombre:'Juan Pérez',telefono:'311 222 4567',direccion:'Carrera 7 # 12-3'},
-    {nombre:'Lucía Martínez',telefono:'315 888 9000',direccion:'Av. 15 # 8-90'},
-    {nombre:'Carlos Ruiz',telefono:'318 444 7777',direccion:'Calle 22 # 1-15'},
-    {nombre:'Ana Torres',telefono:'314 666 3210',direccion:'Carrera 3 # 5-6'}];
-  const PR=['Arroz 5kg','Aceite 1L','Azúcar 2kg','Café 500g','Leche 1L','Panela 1kg','Sal 1kg','Harina 2kg','Jabón x3','Pasta x2','Atún x2','Frijoles 1kg'];
-  CL.forEach((c,i)=>db.clientes.push({id:db.nci++,...c,color:CC[i%CC.length]}));
-  let now=new Date();
-  db.clientes.forEach(c=>{
-    let n=3+Math.floor(Math.random()*5);
-    for(let i=0;i<n;i++){
-      let d=new Date(now);d.setDate(d.getDate()-Math.floor(Math.random()*60));
-      db.movimientos.push({id:db.nmi++,clienteId:c.id,producto:PR[Math.floor(Math.random()*PR.length)],cantidad:1+Math.floor(Math.random()*4),valorUnit:(1+Math.floor(Math.random()*15))*2000,fecha:d.toISOString().split('T')[0],pagado:false,tipo:'individual'});
-    }
-  });
-  save('Estado inicial');
+  // seed() solo inicializa db vacío — NUNCA guarda en Firebase
+  // para no sobreescribir datos reales
+  console.log('[SEED] Base de datos lista para usar');
+  db = {clientes:[],movimientos:[],liquidaciones:[],nci:1,nmi:1,nli:1};
+  // Guardar solo en localStorage, NUNCA en Firebase
+  try{ localStorage.setItem('te4_db', JSON.stringify(db)); }catch(e){}
 }
 
 // ═══════════════════════════════════════════
@@ -2572,8 +2567,12 @@ document.addEventListener('DOMContentLoaded',()=>{
   let pdMes=document.getElementById('pd-mes-filter');
   if(pdMes)pdMes.value=new Date().toISOString().slice(0,7);
   if(!load()){
-    // Sin datos locales — intentar cargar desde Firebase antes de sembrar datos demo
+    // Sin datos locales — SIEMPRE buscar en Firebase primero
+    // NUNCA iniciar con datos demo si puede haber datos reales en Firebase
     if(window.__ebeFirebaseOK && window.__ebeDB){
+      // Mostrar indicador de carga mientras esperamos Firebase
+      var loadingEl = document.getElementById('save-status');
+      if(loadingEl) loadingEl.textContent = '⏳ Cargando datos...';
       window.__ebeDB.get().then(function(doc){
         if(doc.exists && doc.data().appData){
           try{
@@ -2584,22 +2583,28 @@ document.addEventListener('DOMContentLoaded',()=>{
               localStorage.setItem('te4_db', JSON.stringify(parsed));
               var fbTs = doc.data().updatedAt ? new Date(doc.data().updatedAt).getTime() : Date.now();
               localStorage.setItem('te4_db_ts', fbTs.toString());
-              _lastLocalSaveTs = fbTs;
+              _lastLocalSaveTs = Date.now();
               _initFirebaseSync();
               renderDash();
               _updateTopbarDeuda();
               checkBackupReminder();
+              if(loadingEl) loadingEl.textContent = '✅ Datos cargados desde la nube';
+              console.log('[DB] Cargado desde Firebase:', parsed.clientes.length, 'clientes');
               return;
             }
-          }catch(e){}
+          }catch(e){ console.warn('[DB] Error parseando Firebase:', e); }
         }
-        // Firebase también vacío — sembrar datos demo
+        // Firebase vacío o sin datos válidos — iniciar vacío (SIN demo data)
         seed();
+        _lastLocalSaveTs = Date.now();
         _initFirebaseSync();
         renderDash();
         _updateTopbarDeuda();
         checkBackupReminder();
-      }).catch(function(){
+        if(loadingEl) loadingEl.textContent = '💾 Datos guardados';
+      }).catch(function(e){
+        console.warn('[DB] Firebase no disponible al iniciar:', e);
+        // Sin Firebase — iniciar vacío, NO demo data
         seed();
         renderDash();
         _updateTopbarDeuda();
@@ -2607,6 +2612,7 @@ document.addEventListener('DOMContentLoaded',()=>{
       });
       return;
     }
+    // Firebase no configurado — iniciar vacío
     seed();
   }
   renderDash();
