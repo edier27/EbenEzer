@@ -969,20 +969,29 @@ function _migrateDb(){
   db.liquidaciones.forEach(l=>{if(!l.detalle)l.detalle=[];});
 }
 
+// ─── SYNC FIREBASE: ID de sesión para evitar sobreescribir datos propios ──
+// ⚠️ sessionId PERSISTENTE en localStorage para sobrevivir recargas
+var _sessionId = localStorage.getItem('te4_sid');
+if(!_sessionId){ _sessionId = Math.random().toString(36).slice(2,10); localStorage.setItem('te4_sid',_sessionId); }
+var _lastLocalSaveTs = 0;
+var _fbUnsubscribe = null;
+
 function save(desc=''){
   try{
     snapshot(desc);
     const payload=JSON.stringify(db);
     localStorage.setItem('te4_db',payload);
-    localStorage.setItem('te4_db_ts',Date.now().toString());
-    // Guardar en Firebase (nube automática)
+    _lastLocalSaveTs = Date.now();
+    localStorage.setItem('te4_db_ts', _lastLocalSaveTs.toString());
+    localStorage.setItem('te4_sid', _sessionId); // asegurar que sessionId persiste
+    // Guardar en Firebase con sessionId para evitar eco
     if(window.__ebeFirebaseOK && window.__ebeDB){
       window.__ebeDB.set({
         appData: payload,
-        updatedAt: new Date().toISOString()
+        updatedAt: new Date().toISOString(),
+        savedBy: _sessionId
       }).catch(function(e){ console.warn('Error Firebase Eben-ezer:', e); });
     }
-    // Indicador visual de guardado
     let el=document.getElementById('save-status');
     if(el){
       el.textContent='✅ Guardado';
@@ -997,37 +1006,56 @@ function save(desc=''){
     console.error('Error guardando:',e);
   }
 }
+
+// Iniciar sincronización en tiempo real con Firebase
+function _initFirebaseSync(){
+  if(!window.__ebeFirebaseOK || !window.__ebeDB) return;
+  // Cancelar listener anterior si existe
+  if(_fbUnsubscribe) { try { _fbUnsubscribe(); } catch(e){} }
+  
+  _fbUnsubscribe = window.__ebeDB.onSnapshot(function(doc){
+    if(!doc.exists){
+      // Primera vez en Firebase — subir datos locales
+      save('Primera sincronización con Firebase');
+      return;
+    }
+    var fbData = doc.data();
+    // ⚠️ IGNORAR nuestros propios saves para evitar eco/sobreescritura
+    if(fbData.savedBy === _sessionId) return;
+    // Solo sincronizar si Firebase tiene datos MÁS recientes
+    var fbTs = fbData.updatedAt ? new Date(fbData.updatedAt).getTime() : 0;
+    if(fbTs <= _lastLocalSaveTs) return;
+    // Protección extra: no aplicar si Firebase tiene MENOS clientes que local
+    if(fbData.appData){
+      try{
+        var testParsed = JSON.parse(fbData.appData);
+        if(testParsed && Array.isArray(testParsed.clientes) &&
+           testParsed.clientes.length < db.clientes.length) return;
+      }catch(e){ return; }
+    }
+    // Aplicar datos de Firebase (vienen de otro dispositivo)
+    try{
+      var parsed = JSON.parse(fbData.appData);
+      if(parsed && Array.isArray(parsed.clientes)){
+        db = parsed;
+        _migrateDb();
+        localStorage.setItem('te4_db', JSON.stringify(parsed));
+        localStorage.setItem('te4_db_ts', fbTs.toString());
+        _lastLocalSaveTs = fbTs;
+        refreshAll();
+        console.log('🔄 Datos sincronizados desde otro dispositivo');
+      }
+    }catch(e){ console.warn('Error aplicando sync Firebase:', e); }
+  }, function(err){ console.warn('Error listener Firebase:', err); });
+}
+
 function _updateTopbarDeuda(){
   let td=db.clientes.reduce((s,c)=>s+deuda(c.id),0);
   let el=document.getElementById('topbar-deuda-total');
   if(el && td>0) el.textContent='💰 Total en fiados: '+fmt(td);
   else if(el) el.textContent='Sistema de Fiados';
 }
-// Cargar datos frescos desde Firebase (asíncrono)
-function _loadFromFirebase(){
-  if(!window.__ebeFirebaseOK || !window.__ebeDB) return;
-  window.__ebeDB.get().then(function(doc){
-    if(doc.exists && doc.data().appData){
-      try{
-        const fbData = JSON.parse(doc.data().appData);
-        const fbTs = doc.data().updatedAt ? new Date(doc.data().updatedAt).getTime() : 0;
-        const localTs = parseInt(localStorage.getItem('te4_db_ts')||'0');
-        // Solo actualizar si Firebase tiene datos más recientes
-        if(fbTs > localTs && fbData && Array.isArray(fbData.clientes)){
-          db = fbData;
-          _migrateDb();
-          localStorage.setItem('te4_db', JSON.stringify(fbData));
-          localStorage.setItem('te4_db_ts', fbTs.toString());
-          refreshAll();
-          console.log('✅ Datos actualizados desde Firebase');
-        }
-      }catch(e){ console.warn('Error procesando Firebase:', e); }
-    } else if(!doc.exists) {
-      // Primera vez: subir datos locales a Firebase
-      save('Primera sincronización con Firebase');
-    }
-  }).catch(function(e){ console.warn('Error leyendo Firebase:', e); });
-}
+// _loadFromFirebase reemplazado por _initFirebaseSync (ver arriba)
 
 function load(){
   _loadHistorial();
@@ -1041,8 +1069,11 @@ function load(){
         db=parsed;
         _migrateDb();
         console.log('[DB] Cargado desde localStorage — ts:',ts?new Date(parseInt(ts)).toLocaleString():'—',`(${db.clientes.length} clientes, ${db.movimientos.length} movs)`);
-        // Cargar datos frescos de Firebase en segundo plano
-        _loadFromFirebase();
+        // Iniciar sincronización en tiempo real con Firebase
+        // Marcar como "ahora" para que onSnapshot no sobreescriba al iniciar
+        _lastLocalSaveTs = Date.now();
+        localStorage.setItem('te4_db_ts', _lastLocalSaveTs.toString());
+        _initFirebaseSync();
         return true;
       }
     }
@@ -1079,6 +1110,11 @@ function load(){
 // SEED
 // ═══════════════════════════════════════════
 function seed(){
+  // PROTECCIÓN: si ya hay datos, no sembrar demo
+  if(db.clientes && db.clientes.length > 0){
+    console.warn('[SEED] Protegido — ya hay datos, no se sobreescribe');
+    return;
+  }
   const CC=['#2563a8','#1a7a4a','#6b4c9a','#4a7fb5','#2980b9','#c0392b','#16a085'];
   const CL=[{nombre:'María García',telefono:'310 555 1234',direccion:'Calle 10 # 5-20'},
     {nombre:'Juan Pérez',telefono:'311 222 4567',direccion:'Carrera 7 # 12-3'},
@@ -2535,7 +2571,44 @@ document.addEventListener('DOMContentLoaded',()=>{
   // Set default month filter to current month
   let pdMes=document.getElementById('pd-mes-filter');
   if(pdMes)pdMes.value=new Date().toISOString().slice(0,7);
-  if(!load())seed();
+  if(!load()){
+    // Sin datos locales — intentar cargar desde Firebase antes de sembrar datos demo
+    if(window.__ebeFirebaseOK && window.__ebeDB){
+      window.__ebeDB.get().then(function(doc){
+        if(doc.exists && doc.data().appData){
+          try{
+            var parsed = JSON.parse(doc.data().appData);
+            if(parsed && Array.isArray(parsed.clientes)){
+              db = parsed;
+              _migrateDb();
+              localStorage.setItem('te4_db', JSON.stringify(parsed));
+              var fbTs = doc.data().updatedAt ? new Date(doc.data().updatedAt).getTime() : Date.now();
+              localStorage.setItem('te4_db_ts', fbTs.toString());
+              _lastLocalSaveTs = fbTs;
+              _initFirebaseSync();
+              renderDash();
+              _updateTopbarDeuda();
+              checkBackupReminder();
+              return;
+            }
+          }catch(e){}
+        }
+        // Firebase también vacío — sembrar datos demo
+        seed();
+        _initFirebaseSync();
+        renderDash();
+        _updateTopbarDeuda();
+        checkBackupReminder();
+      }).catch(function(){
+        seed();
+        renderDash();
+        _updateTopbarDeuda();
+        checkBackupReminder();
+      });
+      return;
+    }
+    seed();
+  }
   renderDash();
   _updateTopbarDeuda();
   checkBackupReminder();
