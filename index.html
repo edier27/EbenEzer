@@ -1121,12 +1121,10 @@ function load(){
 // SEED
 // ═══════════════════════════════════════════
 function seed(){
-  // seed() solo inicializa db vacío — NUNCA guarda en Firebase
-  // para no sobreescribir datos reales
-  console.log('[SEED] Base de datos lista para usar');
+  // Sin datos demo — arranca completamente limpio
   db = {clientes:[],movimientos:[],liquidaciones:[],nci:1,nmi:1,nli:1};
-  // Guardar solo en localStorage, NUNCA en Firebase
   try{ localStorage.setItem('te4_db', JSON.stringify(db)); }catch(e){}
+  console.log('[DB] Software listo — base de datos vacía');
 }
 
 // ═══════════════════════════════════════════
