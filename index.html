@@ -973,7 +973,9 @@ function _migrateDb(){
 // ⚠️ sessionId PERSISTENTE en localStorage para sobrevivir recargas
 var _sessionId = localStorage.getItem('te4_sid');
 if(!_sessionId){ _sessionId = Math.random().toString(36).slice(2,10); localStorage.setItem('te4_sid',_sessionId); }
-var _lastLocalSaveTs = 0;
+var _lastLocalSaveTs = (function(){
+  try { return parseInt(localStorage.getItem('te4_db_ts')||'0',10); } catch(e){ return 0; }
+})();
 var _fbUnsubscribe = null;
 
 function save(desc=''){
@@ -990,7 +992,10 @@ function save(desc=''){
         appData: payload,
         updatedAt: new Date().toISOString(),
         savedBy: _sessionId
-      }).catch(function(e){ console.warn('Error Firebase Eben-ezer:', e); });
+      }).catch(function(e){
+      console.warn('[EBE] Sin internet — guardado pendiente para sincronizar', e);
+      try{ localStorage.setItem('ebe_pending_sync','1'); }catch(err){}
+    });
     }
     let el=document.getElementById('save-status');
     if(el){
@@ -1010,55 +1015,77 @@ function save(desc=''){
 // Iniciar sincronización en tiempo real con Firebase
 function _initFirebaseSync(){
   if(!window.__ebeFirebaseOK || !window.__ebeDB) return;
-  // Cancelar listener anterior si existe
-  if(_fbUnsubscribe) { try { _fbUnsubscribe(); } catch(e){} }
-  
+  if(_fbUnsubscribe){ try{ _fbUnsubscribe(); }catch(e){} }
+
+  // ── localStorage es la fuente de verdad ABSOLUTA ──
+  var _hasLocalData = db && db.clientes && db.clientes.length > 0;
+
+  if(_hasLocalData){
+    // Tenemos datos locales — subir a Firebase como respaldo, ignorar Firebase entrante
+    var payload = JSON.stringify(db);
+    window.__ebeDB.set({
+      appData:   payload,
+      updatedAt: new Date().toISOString(),
+      savedBy:   _sessionId
+    }).catch(function(e){ console.warn('[EBE] Error subiendo a Firebase:', e); });
+  }
+
+  // onSnapshot: solo aplica si NO hay datos locales (dispositivo nuevo)
+  var _fbApplied = false;
   _fbUnsubscribe = window.__ebeDB.onSnapshot(function(doc){
+    // Si hay datos locales — Firebase NO puede sobreescribir NUNCA
+    if(_hasLocalData) return;
+    if(_fbApplied) return;
+    if(doc.exists && doc.data().savedBy === _sessionId) return;
+
     if(!doc.exists){
-      // Primera vez en Firebase — subir datos locales
-      save('Primera sincronización con Firebase');
+      // Firebase vacío y sin datos locales — empezar limpio
+      _fbApplied = true;
       return;
     }
-    var fbData = doc.data();
-    // ⚠️ IGNORAR nuestros propios saves para evitar eco/sobreescritura
-    if(fbData.savedBy === _sessionId) return;
-    // Solo sincronizar si Firebase tiene datos MÁS recientes
-    var fbTs = fbData.updatedAt ? new Date(fbData.updatedAt).getTime() : 0;
-    if(fbTs <= _lastLocalSaveTs) return;
-    // Protección máxima: no aplicar si Firebase tiene menos registros que local
-    if(fbData.appData){
+    if(doc.data().appData){
       try{
-        var testParsed = JSON.parse(fbData.appData);
-        if(testParsed && Array.isArray(testParsed.clientes)){
-          // Rechazar si Firebase tiene menos clientes O menos movimientos
-          if(testParsed.clientes.length < db.clientes.length) {
-            console.warn('[SYNC] Firebase tiene menos clientes — ignorado');
-            return;
-          }
-          var fbMovs = (testParsed.movimientos||[]).length;
-          var localMovs = (db.movimientos||[]).length;
-          if(fbMovs < localMovs) {
-            console.warn('[SYNC] Firebase tiene menos movimientos — ignorado');
-            return;
-          }
+        var parsed = JSON.parse(doc.data().appData);
+        if(parsed && Array.isArray(parsed.clientes)){
+          db = parsed;
+          _migrateDb();
+          try{ localStorage.setItem('te4_db', JSON.stringify(parsed)); }catch(e){}
+          var fbTs = doc.data().updatedAt ? new Date(doc.data().updatedAt).getTime() : 0;
+          localStorage.setItem('te4_db_ts', fbTs.toString());
+          _lastLocalSaveTs = Date.now();
+          _fbApplied   = true;
+          _hasLocalData = true;
+          refreshAll();
+          console.log('[EBE] Datos cargados desde Firebase (dispositivo nuevo)');
         }
-      }catch(e){ return; }
+      }catch(e){ console.warn('[EBE] Error leyendo Firebase:', e); }
     }
-    // Aplicar datos de Firebase (vienen de otro dispositivo)
-    try{
-      var parsed = JSON.parse(fbData.appData);
-      if(parsed && Array.isArray(parsed.clientes)){
-        db = parsed;
-        _migrateDb();
-        localStorage.setItem('te4_db', JSON.stringify(parsed));
-        localStorage.setItem('te4_db_ts', fbTs.toString());
-        _lastLocalSaveTs = fbTs;
-        refreshAll();
-        console.log('🔄 Datos sincronizados desde otro dispositivo');
-      }
-    }catch(e){ console.warn('Error aplicando sync Firebase:', e); }
-  }, function(err){ console.warn('Error listener Firebase:', err); });
+  }, function(err){
+    console.warn('[EBE] Firebase no disponible, modo offline:', err);
+  });
 }
+
+// ── AUTO-SYNC cuando vuelve el internet ─────────────────────
+(function(){
+  function syncPending(){
+    if(!localStorage.getItem('ebe_pending_sync')) return;
+    if(!window.__ebeFirebaseOK || !window.__ebeDB) return;
+    try{
+      var stored = localStorage.getItem('te4_db');
+      if(!stored) return;
+      window.__ebeDB.set({
+        appData:   stored,
+        updatedAt: new Date().toISOString(),
+        savedBy:   _sessionId
+      }).then(function(){
+        localStorage.removeItem('ebe_pending_sync');
+        console.log('[EBE] ✅ Datos sincronizados automáticamente al recuperar internet');
+      }).catch(function(e){ console.warn('[EBE] Reintento fallido:', e); });
+    }catch(e){}
+  }
+  window.addEventListener('online', syncPending);
+  if(navigator.onLine) setTimeout(syncPending, 2000);
+})();
 
 function _updateTopbarDeuda(){
   let td=db.clientes.reduce((s,c)=>s+deuda(c.id),0);
