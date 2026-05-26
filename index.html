@@ -1823,7 +1823,7 @@ function enviarWhatsApp(clienteId, modo){
     return linea;
   }).join('\n');
 
-  let fecha=new Date().toLocaleDateString('es-CO',{day:'2-digit',month:'long',year:'numeric'});
+  let fecha=colombiaDate().toLocaleDateString('es-CO',{day:'2-digit',month:'long',year:'numeric'});
   let encabezado=modo==='liquidar'
     ? `Hola ${c.nombre.split(' ')[0]}, te comparto el resumen de tu cuenta para proceder con el cobro:`
     : `Hola ${c.nombre.split(' ')[0]}, te enviamos el resumen de tu cuenta en *Tienda Eben-ezer*:`;
@@ -1979,7 +1979,7 @@ function confirmarAbonoParcial(id,total){
   // WA: sin número Nequi en comprobante de abono
   let tel=formatearTelefono(c.telefono);
   if(tel){
-    let msg=`*COMPROBANTE DE ABONO*\nTienda Eben-ezer\n\nHola ${c.nombre.split(' ')[0]}, confirmamos tu abono:\n\n*Abono recibido:* ${fmt(abono)}\n*Saldo pendiente:* ${fmt(saldo)}\n*Fecha:* ${new Date().toLocaleDateString('es-CO',{day:'2-digit',month:'long',year:'numeric'})} ${new Date().toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'})}\n\n🏪 _Gracias por tu pago — Tienda Eben-ezer_`;
+    let msg=`*COMPROBANTE DE ABONO*\nTienda Eben-ezer\n\nHola ${c.nombre.split(' ')[0]}, confirmamos tu abono:\n\n*Abono recibido:* ${fmt(abono)}\n*Saldo pendiente:* ${fmt(saldo)}\n*Fecha:* ${colombiaDate().toLocaleDateString('es-CO',{day:'2-digit',month:'long',year:'numeric'})} ${new Date().toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'})}\n\n🏪 _Gracias por tu pago — Tienda Eben-ezer_`;
     toastWA('✓ Abono registrado — ¿enviar comprobante?','https://wa.me/'+tel+'?text='+encodeURIComponent(msg));
   }
 }
@@ -2062,7 +2062,7 @@ function confirmarPago(id,total,numProductos){
   let tel=formatearTelefono(c.telefono);
   if(tel){
     let lista=detallePagado.map(p=>`• ${p.producto}${p.cantidad>1?' ×'+p.cantidad:''} = ${fmt(p.valorUnit*p.cantidad)}`).join('\n');
-    let fechaStr=new Date().toLocaleDateString('es-CO',{day:'2-digit',month:'long',year:'numeric'})+' '+new Date().toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'});
+    let fechaStr=colombiaDate().toLocaleDateString('es-CO',{day:'2-digit',month:'long',year:'numeric'})+' '+new Date().toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'});
     let msg=`*COMPROBANTE DE PAGO TOTAL*\nTienda Eben-ezer\n\nHola ${c.nombre.split(' ')[0]}, confirmamos el pago total de tu cuenta:\n\n*Productos pagados:*\n${lista}\n\n*Total cancelado: ${fmt(total)}*\n*Fecha:* ${fechaStr}\n\nGracias por tu pago.`;
     toastWA('✓ Cuenta liquidada — ¿enviar comprobante?','https://wa.me/'+tel+'?text='+encodeURIComponent(msg));
   }
@@ -2352,7 +2352,7 @@ function cargarDatosNequiModal(){
 // ═══════════════════════════════════════════
 function imprimirCuenta(id){
   let c=db.clientes.find(x=>x.id===id),movs=activos(id),total=deuda(id);
-  let fechaImp=new Date().toLocaleDateString('es-CO',{year:'numeric',month:'long',day:'numeric'});
+  let fechaImp=colombiaDate().toLocaleDateString('es-CO',{year:'numeric',month:'long',day:'numeric'});
   let rows=movs.map((m,i)=>`<tr style="border-bottom:1px solid #c5d8ee;"><td style="padding:8px 10px;color:#7a96b5">${i+1}</td><td style="padding:8px 10px;color:#7a96b5">${fmtFechaHora(m.fecha)}</td><td style="padding:8px 10px"><strong>${m.producto}</strong></td><td style="padding:8px 10px;text-align:center">${m.cantidad}</td><td style="padding:8px 10px;text-align:right;color:#3b5a82">${fmt(m.valorUnit)}</td><td style="padding:8px 10px;text-align:right;font-weight:700;color:#2563a8">${fmt(m.valorUnit*m.cantidad)}</td></tr>`).join('');
   let html=`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>Cuenta - ${c.nombre}</title><style>
     *{margin:0;padding:0;box-sizing:border-box;}
@@ -2918,7 +2918,7 @@ function renderSubPage(p){
 }
 
 // Override showPage to use sub-pages when in reportes tab
-function showPage(p){switchSubPage(p);}
+// showPage alias removed - using main function
 
 // ═══════════════════════════════════════════
 // REGISTRO MODE SWITCHING
@@ -3302,7 +3302,7 @@ function regConfirmarAbono(id,total){
   toast(`✓ Abono ${fmt(abono)} para ${c.nombre} — Saldo: ${fmt(saldo)}`);
   let tel=formatearTelefono(c.telefono);
   if(tel){
-    let fechaStr=new Date().toLocaleDateString('es-CO',{day:'2-digit',month:'long',year:'numeric'})+' '+new Date().toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'});
+    let fechaStr=colombiaDate().toLocaleDateString('es-CO',{day:'2-digit',month:'long',year:'numeric'})+' '+new Date().toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'});
     let msg=`*COMPROBANTE DE ABONO PARCIAL*\nTienda Eben-ezer\n\nHola ${c.nombre.split(' ')[0]}, registramos tu abono:\n\n*Abono recibido:* ${fmt(abono)}\n*Saldo pendiente:* ${fmt(saldo)}\n*Fecha:* ${fechaStr}\n\n🙏 _Tienda Eben-ezer_`;
     toastWA('✓ Abono registrado — ¿enviar comprobante?','https://wa.me/'+tel+'?text='+encodeURIComponent(msg));
   }
@@ -3368,7 +3368,7 @@ function confirmarAbonoDeuda(clienteId,movId,valTotal,completo){
   refreshAll();
   let tel=formatearTelefono(c.telefono);
   if(tel){
-    let fechaStr=new Date().toLocaleDateString('es-CO',{day:'2-digit',month:'long',year:'numeric'})+' '+new Date().toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'});
+    let fechaStr=colombiaDate().toLocaleDateString('es-CO',{day:'2-digit',month:'long',year:'numeric'})+' '+new Date().toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'});
     let tipoMsg=completo||abono>=valTotal?'PAGO COMPLETO':'ABONO PARCIAL';
     let saldoMsg=completo||abono>=valTotal?'¡Deuda cancelada! ✅':'Saldo pendiente de esta deuda: '+fmt(Math.max(0,saldo));
     // Sin número Nequi en comprobante de abono; en pago total sí se incluye
@@ -3392,7 +3392,7 @@ function regConfirmarLiq(id,total,numProductos){
   let tel=formatearTelefono(c.telefono);
   if(tel){
     let lista=detallePagado.map(p=>`• ${p.producto}${p.cantidad>1?' ×'+p.cantidad:''} = ${fmt(p.valorUnit*p.cantidad)}`).join('\n');
-    let fechaStr=new Date().toLocaleDateString('es-CO',{day:'2-digit',month:'long',year:'numeric'})+' '+new Date().toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'});
+    let fechaStr=colombiaDate().toLocaleDateString('es-CO',{day:'2-digit',month:'long',year:'numeric'})+' '+new Date().toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'});
     let msg=`*COMPROBANTE DE PAGO TOTAL*\nTienda Eben-ezer\n\nHola ${c.nombre.split(' ')[0]}, confirmamos el pago total:\n\n*Productos pagados:*\n${lista}\n\n*Total cancelado: ${fmt(total)}*\n*Fecha:* ${fechaStr}\n\nGracias por tu pago.`;
     toastWA('✓ Cuenta liquidada — ¿enviar comprobante?','https://wa.me/'+tel+'?text='+encodeURIComponent(msg));
   }
