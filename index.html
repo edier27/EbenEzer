@@ -989,6 +989,15 @@ function save(desc=''){
     const ts = Date.now();
     _lastLocalSaveTs = ts;
 
+    // ══ PROTECCIÓN ANTI-BORRADO ═══════════════════════════════════════════════
+    // NUNCA guardar en Firebase si los datos están vacíos
+    // Esto evita que se sobreescriban datos reales con arrays vacíos
+    var totalRegistros = (db.clientes||[]).length + (db.movimientos||[]).length + (db.liquidaciones||[]).length;
+    if(totalRegistros === 0 && desc !== 'Primera sincronización con Firebase'){
+      console.warn('[EBE] 🛑 Guardado bloqueado — db vacío, no se sobreescribe Firebase');
+      return;
+    }
+
     // ══ FIREBASE PRIMERO ══════════════════════════════════════════════════════
     // Si hay internet → subir a Firebase PRIMERO, localStorage como respaldo
     // Si no hay internet → guardar en localStorage y sincronizar después
@@ -1118,20 +1127,45 @@ function _initFirebaseSync(){
   if(_fbUnsubscribe) { try { _fbUnsubscribe(); } catch(e){} }
   
   _fbUnsubscribe = window.__ebeDB.onSnapshot(function(doc){
+    // ── Primer disparo del listener (startup) ──────────────────────────────
+    var _dbVacio = (db.clientes||[]).length === 0 && (db.movimientos||[]).length === 0;
+
     if(!doc.exists){
-      // Primera vez en Firebase — subir datos locales
-      save('Primera sincronización con Firebase');
+      // Firebase vacío — si tenemos datos locales, subirlos
+      if(!_dbVacio){
+        save('Primera sincronización con Firebase');
+      }
       return;
     }
     var fbData = doc.data();
+    var fbTs = fbData.updatedAt ? new Date(fbData.updatedAt).getTime() : 0;
+
+    // ── Si el db local está VACÍO, SIEMPRE cargar desde Firebase ──────────
+    // (sin importar sessionId — es un dispositivo nuevo o caché borrado)
+    if(_dbVacio && fbData.appData){
+      try{
+        var parsed = JSON.parse(fbData.appData);
+        var fbTotal = (parsed.clientes||[]).length + (parsed.movimientos||[]).length;
+        if(fbTotal > 0){
+          db = parsed;
+          _migrateDb();
+          localStorage.setItem('te4_db', JSON.stringify(parsed));
+          localStorage.setItem('te4_db_ts', fbTs.toString());
+          _lastLocalSaveTs = fbTs;
+          refreshAll();
+          console.log('[EBE] ✅ Datos restaurados desde Firebase:', (parsed.clientes||[]).length, 'clientes,', (parsed.movimientos||[]).length, 'movimientos');
+          return;
+        }
+      }catch(e){ console.warn('[EBE] Error restaurando Firebase:', e); }
+    }
+
     // ⚠️ IGNORAR nuestros propios saves para evitar eco/sobreescritura
     if(fbData.savedBy === _sessionId) return;
     // Solo sincronizar si Firebase tiene datos MÁS recientes
-    var fbTs = fbData.updatedAt ? new Date(fbData.updatedAt).getTime() : 0;
     // Si locales más recientes Y tienen más datos, ignorar Firebase
-    if(fbTs <= _lastLocalSaveTs && db.clientes.length > 0) return;
+    if(fbTs <= _lastLocalSaveTs && (db.clientes||[]).length > 0) return;
     // Si local no tiene datos, siempre aplicar Firebase
-    if(db.clientes.length === 0 && fbTs === 0) return;
+    if((db.clientes||[]).length === 0 && fbTs === 0) return;
     // Protección máxima: no aplicar si Firebase tiene menos registros que local
     if(fbData.appData){
       try{
