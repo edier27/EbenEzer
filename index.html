@@ -19,6 +19,7 @@
 <!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script>
   try {
     var _fbCfg = {
@@ -31,7 +32,13 @@
     };
     var _ebeApp = firebase.apps.find(function(a){ return a.name === 'ebeapp'; });
     if (!_ebeApp) _ebeApp = firebase.initializeApp(_fbCfg, 'ebeapp');
-    window.__ebeDB = _ebeApp.firestore().collection("ebenezer").doc("main");
+    window.__ebeFS = _ebeApp.firestore();
+    // Doc legado (versión sin login) — solo para migrar datos antiguos una vez
+    window.__ebeLegacyDB = window.__ebeFS.collection("ebenezer").doc("main");
+    // __ebeDB se reasigna al doc del negocio (ebe_clientes/{clientId}) tras el login
+    window.__ebeDB = null;
+    try { window.__ebeAuth = _ebeApp.auth(); } catch(eA){ console.warn("[EBE] Auth no disponible:", eA); }
+    window.__EBE_ADMIN_UID = "aQdG73vJs2V9gqSl2SKCrLSDott1";
     window.__ebeFirebaseOK = true;
   } catch(e) {
     window.__ebeFirebaseOK = false;
@@ -1780,6 +1787,68 @@ input::placeholder, textarea::placeholder { color: #9CA3AF !important; }
 </head>
 <body>
 
+<!-- ═══════════ LOGIN / REGISTRO / LICENCIA (protección de cuenta) ═══════════ -->
+<style>
+#ebe-auth-screen{position:fixed;inset:0;z-index:50000;background:linear-gradient(160deg,#1a1814 0%,#16302a 45%,#1c4f3c 100%);display:flex;align-items:center;justify-content:center;padding:18px;overflow-y:auto;}
+.ebe-auth-card{background:#fff;border-radius:18px;padding:30px 26px;width:100%;max-width:390px;box-shadow:0 20px 60px rgba(0,0,0,.45);}
+.ebe-auth-logo{width:64px;height:64px;background:linear-gradient(135deg,#1c4f3c,#2d7a5f);border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:30px;margin:0 auto 14px;box-shadow:0 8px 24px rgba(28,79,60,.35);}
+.ebe-auth-title{font-family:'DM Sans',sans-serif;font-size:20px;font-weight:800;color:#1A1A2E;text-align:center;}
+.ebe-auth-sub{font-size:13px;color:#A0AEC0;text-align:center;margin:4px 0 22px;}
+.ebe-field{margin-bottom:12px;}
+.ebe-field label{display:block;font-size:10px;font-weight:700;color:#9CA3AF;letter-spacing:1.1px;text-transform:uppercase;margin-bottom:5px;}
+.ebe-field input{width:100%;padding:12px 14px;border:1.5px solid #E8EAED;border-radius:11px;font-size:14px;font-family:'Inter',sans-serif;color:#1A1A2E;background:#F8F9FA;outline:none;transition:all .2s;box-sizing:border-box;}
+.ebe-field input:focus{border-color:#1c4f3c;box-shadow:0 0 0 3px rgba(28,79,60,.12);background:#fff;}
+.ebe-btn-main{width:100%;padding:13px;background:linear-gradient(135deg,#1c4f3c,#2d7a5f);color:#fff;font-size:15px;font-weight:700;font-family:'Inter',sans-serif;border:none;border-radius:12px;cursor:pointer;margin-top:6px;box-shadow:0 4px 16px rgba(28,79,60,.35);}
+.ebe-btn-main:hover{filter:brightness(1.07);}
+.ebe-auth-err{color:#DC2626;font-size:12px;text-align:center;margin-top:10px;min-height:16px;}
+.ebe-auth-links{text-align:center;margin-top:14px;font-size:13px;}
+.ebe-auth-links a{text-decoration:none;}
+</style>
+<div id="ebe-auth-screen">
+  <div class="ebe-auth-card">
+    <div class="ebe-auth-logo">🏪</div>
+    <div class="ebe-auth-title">Tienda Eben-ezer</div>
+    <div class="ebe-auth-sub" id="ebe-auth-sub">Sistema de Fiados · Inicia sesión</div>
+
+    <!-- LOGIN -->
+    <div id="ebe-login-form">
+      <div class="ebe-field"><label>Correo</label><input id="elu" type="email" placeholder="tucorreo@ejemplo.com" autocomplete="email" onkeydown="if(event.key==='Enter')document.getElementById('elp').focus()"></div>
+      <div class="ebe-field"><label>Contraseña</label><input id="elp" type="password" placeholder="••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLoginEbe()"></div>
+      <button class="ebe-btn-main" onclick="doLoginEbe()">Entrar al Sistema</button>
+      <div class="ebe-auth-err" id="elerr"></div>
+      <div class="ebe-auth-links">
+        <a href="#" onclick="ebeShowRegister();return false;" style="color:#059669;font-weight:600;">Crear cuenta nueva</a>
+        <span style="color:#A0AEC0;"> · </span>
+        <a href="#" onclick="ebeReset();return false;" style="color:#A0AEC0;">¿Olvidaste tu contraseña?</a>
+      </div>
+    </div>
+
+    <!-- REGISTRO -->
+    <div id="ebe-register-form" style="display:none;">
+      <div class="ebe-field"><label>Correo</label><input id="eru" type="email" placeholder="tucorreo@ejemplo.com" autocomplete="email"></div>
+      <div class="ebe-field"><label>Contraseña</label><input id="erp" type="password" placeholder="Mín. 6 caracteres" autocomplete="new-password"></div>
+      <div class="ebe-field"><label>Confirmar contraseña</label><input id="erp2" type="password" placeholder="Repite la contraseña" autocomplete="new-password"></div>
+      <div class="ebe-field"><label>Código de activación</label><input id="erc" type="text" placeholder="Ej: PRO-XXXXX-XXXXX" style="text-transform:uppercase;" onkeydown="if(event.key==='Enter')doRegisterEbe()"></div>
+      <button class="ebe-btn-main" onclick="doRegisterEbe()">Crear cuenta y entrar</button>
+      <div class="ebe-auth-err" id="ererr"></div>
+      <div class="ebe-auth-links"><a href="#" onclick="ebeShowLogin();return false;" style="color:#A0AEC0;">← Volver a iniciar sesión</a></div>
+    </div>
+
+    <!-- LICENCIA VENCIDA -->
+    <div id="ebe-expired-form" style="display:none;">
+      <div style="font-size:40px;text-align:center;">⏰</div>
+      <div style="font-size:18px;font-weight:800;color:#1A1A2E;text-align:center;margin-top:6px;">Licencia vencida</div>
+      <div style="font-size:13px;color:#059669;background:#ECFDF5;border-radius:10px;padding:10px;margin:14px 0;text-align:center;">✅ Tus datos están seguros. Al ingresar un código nuevo todo vuelve a funcionar igual.</div>
+      <div class="ebe-field"><label>Código de activación</label><input id="eec" type="text" placeholder="Ej: PRO-XXXXX-XXXXX" style="text-transform:uppercase;" onkeydown="if(event.key==='Enter')ebeRenovar()"></div>
+      <button class="ebe-btn-main" onclick="ebeRenovar()">🔓 Activar y continuar</button>
+      <div class="ebe-auth-err" id="eeerr"></div>
+      <div class="ebe-auth-links"><a href="#" onclick="ebeLogout();return false;" style="color:#A0AEC0;">← Cerrar sesión</a></div>
+    </div>
+
+    <div style="text-align:center;margin-top:18px;color:#D1D5DB;font-size:11px;">Tienda Eben-ezer · Control de fiados protegido</div>
+  </div>
+</div>
+
 <div id="print-area"></div>
 
 <!-- TOPBAR -->
@@ -1816,6 +1885,12 @@ input::placeholder, textarea::placeholder { color: #9CA3AF !important; }
     <button class="sidebar-item" onclick="exportarHTML()">
       <span class="sidebar-item-icon">📲</span> Compartir App
     </button>
+    <button class="sidebar-item" onclick="openModal('m-estado');ebeRefreshLicEstado()">
+      <span class="sidebar-item-icon">🔐</span> Cuenta / Licencia
+    </button>
+    <button class="sidebar-item" onclick="ebeLogout()" style="color:#EF4444;">
+      <span class="sidebar-item-icon">🚪</span> Cerrar sesión
+    </button>
   </nav>
   <div class="sidebar-footer">
     <div class="sidebar-deuda">
@@ -1833,14 +1908,14 @@ input::placeholder, textarea::placeholder { color: #9CA3AF !important; }
   <button class="toggle-sidebar-btn" onclick="toggleSidebar()">☰</button>
   <div class="topbar-title" id="topbar-page-title">Registro</div>
   <span id="save-status"></span>
-  <button class="topbar-btn" onclick="openModal('m-estado')" title="Estado">📡 <span>Estado</span></button>
+  <button class="topbar-btn" onclick="openModal('m-estado');ebeRefreshLicEstado()" title="Estado">📡 <span>Estado</span></button>
   <button class="topbar-btn primary" onclick="switchMainTab('registro');document.getElementById('modo-nuevo').click()">+ Nuevo Fiado</button>
 </header>
 
 <!-- STATUS BAR -->
 
 <div class="undo-bar">
-  <span class="undo-bar-label" id="save-status">💾 Datos guardados</span>
+  <span class="undo-bar-label" id="save-status-bar">💾 Datos guardados</span>
   <div style="flex:1"></div>
   <button class="btn btn-secondary btn-sm" onclick="diagnosticarStorage()" title="Ver estado del almacenamiento">🔍 Estado</button>
   <button class="btn btn-secondary btn-sm" onclick="document.getElementById('imp').click()">📂 Importar</button>
@@ -2346,6 +2421,486 @@ input::placeholder, textarea::placeholder { color: #9CA3AF !important; }
   </div>
 </div>
 
+<!-- MODAL: ESTADO Y CUENTA (antes el botón 📡 apuntaba a un modal inexistente) -->
+<div class="modal-overlay" id="m-estado">
+  <div class="modal">
+    <div class="modal-header"><div class="modal-title">📡 Estado y Cuenta</div><button class="modal-close" onclick="closeModal('m-estado')">✕</button></div>
+    <div class="form-group"><label class="form-label">Cuenta activa</label><div id="estado-cuenta-email" style="font-size:14px;font-weight:600;">—</div></div>
+    <div class="form-group"><label class="form-label">Licencia</label><div id="estado-lic-info" style="font-size:13px;">Cargando...</div></div>
+    <div class="form-group">
+      <label class="form-label">Activar / renovar licencia</label>
+      <div style="display:flex;gap:6px;">
+        <input class="form-input" id="estado-lic-code" placeholder="Ej: PRO-XXXXX-XXXXX" style="text-transform:uppercase;flex:1;">
+        <button class="btn btn-primary" onclick="ebeActivarLicencia()">Activar</button>
+      </div>
+      <div id="estado-lic-msg" style="font-size:12px;margin-top:6px;min-height:14px;"></div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Almacenamiento y sincronización</label>
+      <button class="btn btn-secondary btn-sm" onclick="diagnosticarStorage()">🔍 Diagnóstico de almacenamiento</button>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-secondary" onclick="ebeLogout()" style="color:var(--red);">🚪 Cerrar sesión</button>
+      <button class="btn btn-primary" onclick="closeModal('m-estado')">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+
+<script>
+// ═══════════════════════════════════════════════════════════════════════════
+//  CIMIENTOS DE SEGURIDAD (portado de ACCE PRO / MotoTaller)
+//  Auth real + licencias burnable + aislamiento de datos por negocio.
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Escapa HTML para insertar datos en innerHTML sin riesgo de XSS.
+function _ebeEsc(s){
+  return String(s==null?'':s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+// Saneamiento en la ENTRADA: quita < > para que ningún dato guardado pueda
+// inyectar HTML/scripts al renderizarse (anti-XSS).
+function _ebeClean(s){ return String(s==null?'':s).replace(/[<>]/g,''); }
+// Limpia todos los textos de la base de datos (se llama en cada guardado).
+function _ebeSanitizeDb(){
+  function walk(o){
+    if(!o) return;
+    if(Array.isArray(o)){ o.forEach(walk); return; }
+    if(typeof o==='object'){
+      Object.keys(o).forEach(function(k){
+        var v=o[k];
+        if(typeof v==='string'){ if(v.indexOf('<')>-1||v.indexOf('>')>-1) o[k]=v.replace(/[<>]/g,''); }
+        else walk(v);
+      });
+    }
+  }
+  try{ walk(db.clientes); walk(db.movimientos); walk(db.liquidaciones); }catch(e){}
+}
+
+// Acceso a Auth / uid / admin
+function _ebeAuthInst(){ try{ return window.__ebeAuth; }catch(e){ return null; } }
+function _ebeCurrentUid(){ try{ var a=_ebeAuthInst(); return (a&&a.currentUser)?a.currentUser.uid:(window.__ebeUid||null); }catch(e){ return window.__ebeUid||null; } }
+function _ebeIsAdminUid(uid){ return !!uid && uid===window.__EBE_ADMIN_UID; }
+
+// Hash y salt para licencias (el candado real es la validación en servidor)
+var _EBE_LS='EBE2026FIADOSPRO';
+function _ebeHash(str){
+  var h=5381; for(var i=0;i<str.length;i++){ h=((h<<5)+h)^str.charCodeAt(i); h=h>>>0; }
+  return h.toString(36).toUpperCase().padStart(8,'0').slice(-8);
+}
+
+// Valida formato/expiración de un código (mismo esquema que ACCE PRO / MotoTaller)
+function ebeVerificarCodigo(raw){
+  var c=(raw||'').trim().toUpperCase();
+  var p=c.split('-');
+  var clientId=c.replace(/-/g,'_');
+  if(p[0]==='TEST'&&p.length===3){
+    if(_ebeHash(p[1]+'TEST'+_EBE_LS)!==p[2]) return {valid:false,error:'Código inválido.'};
+    var nowMin=Math.floor(Date.now()/60000), expMin=parseInt(p[1]);
+    if(nowMin>expMin) return {valid:false,error:'Código de prueba expirado.',expired:true};
+    return {valid:true,type:'demo',daysLeft:1,minsLeft:expMin-nowMin,clientId:clientId,isTest:true};
+  }
+  if((p[0]==='DEMO'||p[0]==='TRIAL'||p[0]==='ANUAL')&&p.length===3){
+    if(_ebeHash(p[1]+_EBE_LS)!==p[2]) return {valid:false,error:'Código inválido.'};
+    var dateOnly=p[1].slice(0,8);
+    var exp=new Date(dateOnly.slice(0,4)+'-'+dateOnly.slice(4,6)+'-'+dateOnly.slice(6,8)+'T23:59:59');
+    if(isNaN(exp.getTime())) return {valid:false,error:'Código con formato incorrecto.'};
+    if(new Date()>exp) return {valid:false,error:'Código expirado.',expired:true};
+    return {valid:true,type:'demo',daysLeft:Math.ceil((exp-new Date())/86400000),clientId:clientId};
+  }
+  if(p[0]==='PRO'&&p.length===3){
+    if(_ebeHash(p[1]+'PRO'+_EBE_LS)!==p[2]) return {valid:false,error:'Código inválido.'};
+    return {valid:true,type:'pro',daysLeft:null,clientId:clientId};
+  }
+  return {valid:false,error:'Código inválido. Verifica e intenta de nuevo.'};
+}
+
+// Mensajes de error de Firebase Auth en español
+function _ebeAuthErrMsg(code){
+  var m={
+    'auth/invalid-email':'El correo no es válido.',
+    'auth/user-not-found':'No existe una cuenta con ese correo.',
+    'auth/wrong-password':'Correo o contraseña incorrectos.',
+    'auth/invalid-credential':'Correo o contraseña incorrectos.',
+    'auth/email-already-in-use':'Ese correo ya tiene una cuenta. Inicia sesión.',
+    'auth/weak-password':'La contraseña debe tener al menos 6 caracteres.',
+    'auth/too-many-requests':'Demasiados intentos. Espera un momento e intenta de nuevo.',
+    'auth/network-request-failed':'Sin conexión. Verifica tu internet.'
+  };
+  return m[code]||'No se pudo completar. Verifica tus datos e intenta de nuevo.';
+}
+
+// Perfil del negocio en ebe_users/{uid}
+function _ebeProfileRef(uid){ try{ return window.__ebeFS.collection('ebe_users').doc(uid); }catch(e){ return null; } }
+function _ebeSaveProfile(profile){
+  if(!profile||!profile.uid) return;
+  try{ localStorage.setItem('ebe_profile_'+profile.uid, JSON.stringify(profile)); }catch(e){}
+  try{ var r=_ebeProfileRef(profile.uid); if(r) r.set(profile,{merge:true}).catch(function(){}); }catch(e){}
+}
+function _ebeLoadProfile(uid){
+  return new Promise(function(resolve){
+    var local=null;
+    try{ local=JSON.parse(localStorage.getItem('ebe_profile_'+uid)||'null'); }catch(e){}
+    var r=_ebeProfileRef(uid);
+    if(!r){ resolve(local); return; }
+    r.get().then(function(d){
+      if(d.exists&&d.data()){ var prof=d.data(); prof.uid=uid; try{localStorage.setItem('ebe_profile_'+uid,JSON.stringify(prof));}catch(e){} resolve(prof); }
+      else resolve(local);
+    }).catch(function(){ resolve(local); });
+  });
+}
+
+// VALIDACIÓN SERVIDOR de un código (anti-forja + burnable). Fail-closed.
+function _ebeValidarCodigoServidor(rawCode,uid){
+  return new Promise(function(resolve){
+    var fs=window.__ebeFS;
+    if(!fs){ resolve({ok:false,error:'Servicio no disponible. Verifica tu internet.'}); return; }
+    var codeKey='code_LIC_'+(rawCode||'').trim().toUpperCase().replace(/[^A-Z0-9]/g,'_');
+    fs.collection('ebe_users').doc(codeKey).get().then(function(cdoc){
+      var cd=cdoc.exists?cdoc.data():null;
+      if(!cd||cd.createdByAdmin!==true){ resolve({ok:false,error:'❌ Este código no fue emitido por el administrador. Solicita uno válido.'}); return; }
+      if(cd.used===true&&cd.usedBy&&cd.usedBy!==uid){ resolve({ok:false,error:'❌ Este código ya fue activado por otra cuenta. Pide un código nuevo.'}); return; }
+      resolve({ok:true});
+    }).catch(function(){ resolve({ok:false,error:'No se pudo verificar el código. Revisa tu conexión.'}); });
+  });
+}
+
+// ─── Claves de almacenamiento POR NEGOCIO (aisladas tras el login) ─────────
+var _ebeCid=null;
+var _EBE_BASE_KEYS={db:'te4'+'_db',ts:'te4'+'_db_ts',hist:'te4'+'_hist',pending:'ebe_pending'+'_sync'};
+function _sk(n){ return _ebeCid ? ('ebe_'+_ebeCid+'_'+n) : _EBE_BASE_KEYS[n]; }
+// Migración una sola vez: el PRIMER negocio que inicia sesión en este
+// dispositivo adopta los datos de la versión anterior (sin login).
+function _ebeMigrarClavesLocales(){
+  if(!_ebeCid) return;
+  try{
+    if(localStorage.getItem(_sk('db'))!==null) return; // ya tiene datos propios
+    var claimed=localStorage.getItem('ebe_legacy_claimed');
+    if(claimed && claimed!==_ebeCid) return; // los datos viejos son de otro negocio
+    var tenia=false;
+    Object.keys(_EBE_BASE_KEYS).forEach(function(n){
+      var v=localStorage.getItem(_EBE_BASE_KEYS[n]);
+      if(v!==null){ tenia=true; try{ localStorage.setItem('ebe_'+_ebeCid+'_'+n, v); }catch(e){} }
+    });
+    if(tenia){ try{ localStorage.setItem('ebe_legacy_claimed',_ebeCid); }catch(e){} console.log('[EBE] ✅ Datos locales de la versión anterior adoptados por',_ebeCid); }
+  }catch(e){}
+}
+
+// Indicador de guardado (actualiza el topbar y la barra de acciones a la vez)
+function _setSaveStatus(text,color){
+  var defs={'save-status':'','save-status-bar':'💾 Datos guardados'};
+  Object.keys(defs).forEach(function(id){
+    var el=document.getElementById(id); if(!el) return;
+    el.textContent=text; el.style.color=color||'';
+    clearTimeout(el._t);
+    el._t=setTimeout(function(){ el.textContent=defs[id]; el.style.color=''; },2200);
+  });
+}
+
+// ─── Sesión / aislamiento por negocio ──────────────────────────────────────
+var currentUserEbe=null;
+function ebeShowRegister(){ document.getElementById('ebe-login-form').style.display='none'; document.getElementById('ebe-expired-form').style.display='none'; document.getElementById('ebe-register-form').style.display='block'; }
+function ebeShowLogin(){ document.getElementById('ebe-register-form').style.display='none'; document.getElementById('ebe-expired-form').style.display='none'; document.getElementById('ebe-login-form').style.display='block'; }
+
+function _ebeSetSession(profile){
+  window.__ebeUid=profile.uid;
+  var perm=null; try{ perm=localStorage.getItem('ebe_perm_clientId_'+profile.uid); }catch(e){}
+  var cid=perm||profile.clientId;
+  window.__ebeClientId=cid;
+  if(cid){ try{ localStorage.setItem('ebe_perm_clientId_'+profile.uid,cid); }catch(e){} }
+  _ebeCid=cid||null;
+  _ebeMigrarClavesLocales();                     // localStorage POR NEGOCIO
+  try{ if(window.__ebeFS&&cid) window.__ebeDB=window.__ebeFS.collection('ebe_clientes').doc(cid); }catch(e){} // Firestore POR NEGOCIO
+}
+
+function ebeEnterApp(profile){
+  _ebeSetSession(profile);
+  currentUserEbe={email:profile.email||'',uid:profile.uid};
+  try{ localStorage.setItem('ebe_last_profile',JSON.stringify(profile)); }catch(e){}
+  var s=document.getElementById('ebe-auth-screen'); if(s) s.style.display='none';
+  var acc=document.getElementById('estado-cuenta-email'); if(acc) acc.textContent=profile.email||profile.uid||'—';
+  if(typeof _ebeStartApp==='function') _ebeStartApp();
+}
+
+function ebeShowExpired(profile){
+  window.__ebeUid=profile.uid;
+  var s=document.getElementById('ebe-auth-screen'); if(s) s.style.display='flex';
+  document.getElementById('ebe-login-form').style.display='none';
+  document.getElementById('ebe-register-form').style.display='none';
+  document.getElementById('ebe-expired-form').style.display='block';
+}
+
+function ebeCheckLicenseAndEnter(profile){
+  // Admin: no necesita licencia; gestiona códigos.
+  if(_ebeIsAdminUid(profile.uid)){ profile.clientId=profile.clientId||'EBE_ADMIN'; ebeEnterApp(profile); return; }
+  var lic=ebeVerificarCodigo(profile.licenseCode||'');
+  // clientId FIJO al permanente/perfil antes que al derivado del código (anti-pérdida)
+  var pinned=null; try{ pinned=localStorage.getItem('ebe_perm_clientId_'+profile.uid); }catch(e){}
+  profile.clientId=pinned||profile.clientId||lic.clientId;
+  if(profile.clientId){ try{ localStorage.setItem('ebe_perm_clientId_'+profile.uid,profile.clientId); }catch(e){} }
+  if(!lic.valid){ ebeShowExpired(profile); } else { ebeEnterApp(profile); }
+}
+
+// ─── LOGIN ──────────────────────────────────────────────────────────────────
+function doLoginEbe(){
+  var em=document.getElementById('elu').value.trim().toLowerCase();
+  var p=document.getElementById('elp').value;
+  var errEl=document.getElementById('elerr'); errEl.style.color=''; errEl.textContent='';
+  var auth=_ebeAuthInst();
+  if(!auth){ errEl.textContent='Servicio no disponible. Verifica tu internet.'; return; }
+  if(!em||!p){ errEl.textContent='Ingresa correo y contraseña.'; return; }
+  auth.signInWithEmailAndPassword(em,p).then(function(cred){
+    var uid=cred.user.uid; window.__ebeUid=uid;
+    _ebeLoadProfile(uid).then(function(prof){
+      if(!prof){ prof={uid:uid,email:em,username:em.split('@')[0]}; }
+      prof.uid=uid; ebeCheckLicenseAndEnter(prof);
+    });
+  }).catch(function(e){ errEl.textContent=_ebeAuthErrMsg(e&&e.code); });
+}
+
+// ─── REGISTRO (correo + contraseña + código burnable) ───────────────────────
+function doRegisterEbe(){
+  var em=document.getElementById('eru').value.trim().toLowerCase();
+  var p=document.getElementById('erp').value, p2=document.getElementById('erp2').value;
+  var code=document.getElementById('erc').value.trim().toUpperCase();
+  var errEl=document.getElementById('ererr'); errEl.style.color=''; errEl.textContent='';
+  if(!em){ errEl.textContent='Ingresa tu correo.'; return; }
+  if(p.length<6){ errEl.textContent='La contraseña debe tener al menos 6 caracteres.'; return; }
+  if(p!==p2){ errEl.textContent='Las contraseñas no coinciden.'; return; }
+  var lic=ebeVerificarCodigo(code);
+  if(!lic.valid){ errEl.textContent=lic.error||'Código inválido.'; return; }
+  var auth=_ebeAuthInst(); var fs=window.__ebeFS;
+  if(!auth||!fs){ errEl.textContent='Servicio no disponible.'; return; }
+  errEl.style.color='#059669'; errEl.textContent='Creando cuenta...';
+  auth.createUserWithEmailAndPassword(em,p).then(function(cred){
+    var uid=cred.user.uid; window.__ebeUid=uid;
+    var codeKey='code_LIC_'+code.replace(/[^A-Z0-9]/g,'_');
+    fs.collection('ebe_users').doc(codeKey).get().then(function(cdoc){
+      var cd=cdoc.exists?cdoc.data():null;
+      if(!cd||cd.createdByAdmin!==true){ errEl.style.color=''; errEl.textContent='❌ Este código no fue emitido por el administrador. Solicita uno válido.'; try{cred.user.delete();}catch(e){} return; }
+      if(cd.used===true&&cd.usedBy&&cd.usedBy!==uid){ errEl.style.color=''; errEl.textContent='❌ Este código ya fue activado por otra cuenta.'; try{cred.user.delete();}catch(e){} return; }
+      var clientId=lic.clientId;
+      var profile={uid:uid,email:em,username:em.split('@')[0],clientId:clientId,ownerUid:uid,licenseCode:code,licenseType:lic.type,createdAt:new Date().toISOString()};
+      try{ localStorage.setItem('ebe_perm_clientId_'+uid,clientId); }catch(e){}
+      _ebeSaveProfile(profile);
+      fs.collection('ebe_users').doc(codeKey).set({used:true,usedBy:uid,usedByUser:em.split('@')[0],usedAt:new Date().toISOString(),usedClientId:clientId,codeType:lic.type,code:code},{merge:true}).catch(function(){});
+      ebeCheckLicenseAndEnter(profile);
+    }).catch(function(){ errEl.style.color=''; errEl.textContent='No se pudo verificar el código. Revisa tu conexión.'; try{cred.user.delete();}catch(e){} });
+  }).catch(function(e){ errEl.style.color=''; errEl.textContent=_ebeAuthErrMsg(e&&e.code); });
+}
+
+// ─── RENOVAR (licencia vencida — burnable, NO borra datos) ──────────────────
+function ebeRenovar(){
+  var code=document.getElementById('eec').value.trim().toUpperCase();
+  var errEl=document.getElementById('eeerr'); errEl.style.color=''; errEl.textContent='';
+  var lic=ebeVerificarCodigo(code);
+  if(!lic.valid){ errEl.textContent=lic.error||'Código inválido.'; return; }
+  var uid=_ebeCurrentUid();
+  _ebeValidarCodigoServidor(code,uid).then(function(chk){
+    if(!chk.ok){ errEl.textContent=chk.error; return; }
+    _ebeLoadProfile(uid).then(function(prof){
+      if(!prof){ prof={uid:uid}; }
+      var perm=null; try{ perm=localStorage.getItem('ebe_perm_clientId_'+uid); }catch(e){}
+      var cid=perm||prof.clientId||lic.clientId;
+      if(!cid){ errEl.textContent='No pudimos identificar tu negocio. Cierra sesión y vuelve a entrar.'; return; }
+      prof.uid=uid; prof.licenseCode=code; prof.licenseType=lic.type; prof.clientId=cid;
+      try{ localStorage.setItem('ebe_perm_clientId_'+uid,cid); }catch(e){}
+      _ebeSaveProfile(prof);
+      var fs=window.__ebeFS, codeKey='code_LIC_'+code.replace(/[^A-Z0-9]/g,'_');
+      if(fs) fs.collection('ebe_users').doc(codeKey).set({used:true,usedBy:uid,usedByUser:prof.username||'',usedAt:new Date().toISOString(),usedClientId:cid,codeType:lic.type,code:code},{merge:true}).catch(function(){});
+      ebeEnterApp(prof);
+    });
+  });
+}
+
+// ─── RESET de contraseña ────────────────────────────────────────────────────
+function ebeReset(){
+  var em=(document.getElementById('elu').value||'').trim().toLowerCase();
+  var errEl=document.getElementById('elerr');
+  if(!em){ errEl.style.color=''; errEl.textContent='Escribe tu correo arriba y vuelve a tocar el enlace.'; return; }
+  var auth=_ebeAuthInst(); if(!auth){ errEl.textContent='Servicio no disponible.'; return; }
+  auth.sendPasswordResetEmail(em).then(function(){ errEl.style.color='#059669'; errEl.textContent='✅ Te enviamos un correo para restablecer tu contraseña.'; }).catch(function(e){ errEl.style.color=''; errEl.textContent=_ebeAuthErrMsg(e&&e.code); });
+}
+
+// ─── LOGOUT ─────────────────────────────────────────────────────────────────
+function ebeLogout(){
+  try{ var auth=_ebeAuthInst(); if(auth) auth.signOut(); }catch(e){}
+  try{ localStorage.removeItem('ebe_last_profile'); }catch(e){}
+  window.__ebeUid=null; currentUserEbe=null;
+  // Recargar deja la app limpia y muestra el login (los datos quedan guardados)
+  location.reload();
+}
+
+// ─── Estado/activación de licencia desde el modal Estado ────────────────────
+function ebeRefreshLicEstado(){
+  var acc=document.getElementById('estado-cuenta-email');
+  if(acc) acc.textContent=(currentUserEbe&&currentUserEbe.email)||'—';
+  var el=document.getElementById('estado-lic-info'); if(!el) return;
+  var uid=_ebeCurrentUid();
+  if(_ebeIsAdminUid(uid)){ el.textContent='Administrador — acceso permanente (sin licencia).'; return; }
+  _ebeLoadProfile(uid).then(function(prof){
+    var lic=ebeVerificarCodigo((prof&&prof.licenseCode)||'');
+    if(!lic.valid){ el.innerHTML='<span style="color:#B91C1C;font-weight:700">Sin licencia activa o vencida.</span>'; }
+    else if(lic.type==='pro'){ el.innerHTML='✅ <strong>Licencia PRO</strong> — acceso permanente.'; }
+    else { el.innerHTML='🕐 <strong>'+(lic.minsLeft!=null?lic.minsLeft+' min':lic.daysLeft+' día(s)')+'</strong> restante(s).'; }
+  });
+}
+function ebeActivarLicencia(){
+  var code=(document.getElementById('estado-lic-code').value||'').trim().toUpperCase();
+  var msg=document.getElementById('estado-lic-msg'); msg.style.color=''; msg.textContent='';
+  if(_ebeIsAdminUid(_ebeCurrentUid())){ msg.style.color='#B91C1C'; msg.textContent='Eres administrador: tu cuenta no necesita licencia.'; return; }
+  var lic=ebeVerificarCodigo(code);
+  if(!lic.valid){ msg.style.color='#B91C1C'; msg.textContent=lic.error||'Código inválido.'; return; }
+  var uid=_ebeCurrentUid();
+  msg.style.color='#059669'; msg.textContent='Verificando...';
+  _ebeValidarCodigoServidor(code,uid).then(function(chk){
+    if(!chk.ok){ msg.style.color='#B91C1C'; msg.textContent=chk.error; return; }
+    _ebeLoadProfile(uid).then(function(prof){
+      if(!prof){ prof={uid:uid}; }
+      var perm=null; try{ perm=localStorage.getItem('ebe_perm_clientId_'+uid); }catch(e){}
+      var cid=perm||prof.clientId||window.__ebeClientId||lic.clientId;
+      if(!cid){ msg.style.color='#B91C1C'; msg.textContent='No pudimos identificar tu negocio. Cierra sesión y vuelve a entrar.'; return; }
+      prof.uid=uid; prof.licenseCode=code; prof.licenseType=lic.type; prof.clientId=cid;
+      try{ localStorage.setItem('ebe_perm_clientId_'+uid,cid); }catch(e){}
+      _ebeSaveProfile(prof);
+      var fs=window.__ebeFS, codeKey='code_LIC_'+code.replace(/[^A-Z0-9]/g,'_');
+      if(fs) fs.collection('ebe_users').doc(codeKey).set({used:true,usedBy:uid,usedByUser:prof.username||'',usedAt:new Date().toISOString(),usedClientId:cid,codeType:lic.type,code:code},{merge:true}).catch(function(){});
+      msg.style.color='#059669'; msg.textContent='✅ Licencia activada. ¡Listo!';
+      try{ document.getElementById('estado-lic-code').value=''; }catch(e){}
+      ebeRefreshLicEstado();
+    });
+  });
+}
+
+// ─── Auto-login por Firebase Auth (sesión persistente) ──────────────────────
+var _ebeAuthTries=0;
+function _ebeRestoreSession(){
+  var auth=_ebeAuthInst();
+  if(!auth){
+    _ebeAuthTries++;
+    if(_ebeAuthTries>15){ _ebeOfflineFallback(); return; }
+    setTimeout(_ebeRestoreSession,400); return;
+  }
+  auth.onAuthStateChanged(function(fbUser){
+    if(fbUser){
+      window.__ebeUid=fbUser.uid;
+      _ebeLoadProfile(fbUser.uid).then(function(prof){
+        if(!prof){ prof={uid:fbUser.uid,email:fbUser.email||'',username:(fbUser.email||'').split('@')[0]}; }
+        prof.uid=fbUser.uid; prof.email=prof.email||fbUser.email||'';
+        ebeCheckLicenseAndEnter(prof);
+      });
+    } else if(!currentUserEbe){
+      var s=document.getElementById('ebe-auth-screen'); if(s) s.style.display='flex';
+      ebeShowLogin();
+    }
+  });
+}
+// Sin internet y sin SDK: entrar con la última sesión válida guardada
+function _ebeOfflineFallback(){
+  try{
+    var raw=localStorage.getItem('ebe_last_profile'); if(!raw) return;
+    var prof=JSON.parse(raw);
+    if(!prof||!prof.uid) return;
+    if(_ebeIsAdminUid(prof.uid)){ ebeEnterApp(prof); return; }
+    var lic=ebeVerificarCodigo(prof.licenseCode||'');
+    if(lic.valid) ebeEnterApp(prof);
+  }catch(e){}
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  PANEL ADMIN — generar/ver códigos de licencia (burnable + logable)
+//  Acceso: ?admin=ebenezer  → exige login con la cuenta admin.
+// ═══════════════════════════════════════════════════════════════════════════
+function ebeInitAdminPanel(){
+  try{ document.getElementById('ebe-auth-screen').style.display='none'; }catch(e){}
+  document.body.style.overflow='auto';
+  var c=document.getElementById('ebe-admin-root');
+  if(!c){ c=document.createElement('div'); c.id='ebe-admin-root'; document.body.appendChild(c); }
+  c.style.cssText='position:fixed;inset:0;z-index:60000;overflow-y:auto;background:#F4F5F7;padding:40px 16px;font-family:Inter,system-ui,sans-serif;color:#1A1A2E;';
+  var auth=_ebeAuthInst();
+  if(!auth){ setTimeout(ebeInitAdminPanel,400); return; }
+  auth.onAuthStateChanged(function(u){
+    if(u && _ebeIsAdminUid(u.uid)){ window.__ebeUid=u.uid; ebeRenderAdminCodes(c); }
+    else { ebeRenderAdminLogin(c,u); }
+  });
+}
+function ebeRenderAdminLogin(c,u){
+  c.innerHTML='<div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #E2E8F0;border-radius:16px;padding:28px">'
+    +'<div style="font-size:20px;font-weight:800">🔒 Panel admin · Eben-ezer</div>'
+    +'<div style="font-size:13px;color:#64748B;margin:6px 0 16px">Inicia sesión con la cuenta de administrador.</div>'
+    +(u?'<div style="background:#FEF2F2;color:#B91C1C;padding:8px 12px;border-radius:8px;font-size:13px;margin-bottom:12px">Esta cuenta no es administrador.</div>':'')
+    +'<input id="ealu" type="email" placeholder="Correo admin" style="width:100%;box-sizing:border-box;padding:11px 13px;margin-bottom:10px;border:1px solid #E2E8F4;border-radius:10px;font-size:14px">'
+    +'<input id="ealp" type="password" placeholder="Contraseña" style="width:100%;box-sizing:border-box;padding:11px 13px;margin-bottom:14px;border:1px solid #E2E8F4;border-radius:10px;font-size:14px">'
+    +'<button onclick="ebeAdminLogin()" style="width:100%;padding:12px;background:#1c4f3c;color:#fff;border:none;border-radius:10px;font-weight:700;cursor:pointer">Entrar</button>'
+    +'<div id="eaerr" style="color:#B91C1C;font-size:13px;margin-top:10px"></div></div>';
+}
+function ebeAdminLogin(){
+  var em=(document.getElementById('ealu').value||'').trim().toLowerCase();
+  var p=document.getElementById('ealp').value, e=document.getElementById('eaerr');
+  var auth=_ebeAuthInst(); if(!auth){ e.textContent='Servicio no disponible.'; return; }
+  auth.signInWithEmailAndPassword(em,p).then(function(cred){
+    if(!_ebeIsAdminUid(cred.user.uid)){ e.textContent='Esta cuenta no es administrador.'; }
+  }).catch(function(err){ e.textContent=_ebeAuthErrMsg(err&&err.code); });
+}
+function ebeRenderAdminCodes(c){
+  c.innerHTML='<div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #E2E8F0;border-radius:16px;padding:24px">'
+    +'<div style="font-size:20px;font-weight:800">🏪 Licencias Eben-ezer</div>'
+    +'<div style="font-size:13px;color:#64748B;margin:6px 0 16px">Genera un código y entrégalo a tu cliente. Cada código es de un solo uso.</div>'
+    +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">'
+      +'<button onclick="ebeGenerarCodigo(\'demo\')" style="padding:9px 14px;border:1px solid #E2E8F4;background:#F8FAFC;border-radius:10px;cursor:pointer;font-weight:600">Demo 8 días</button>'
+      +'<button onclick="ebeGenerarCodigo(\'trial\')" style="padding:9px 14px;border:1px solid #E2E8F4;background:#F8FAFC;border-radius:10px;cursor:pointer;font-weight:600">Trial 30 días</button>'
+      +'<button onclick="ebeGenerarCodigo(\'anual\')" style="padding:9px 14px;border:1px solid #E2E8F4;background:#F8FAFC;border-radius:10px;cursor:pointer;font-weight:600">Anual</button>'
+      +'<button onclick="ebeGenerarCodigo(\'pro\')" style="padding:9px 14px;border:1px solid #10B981;background:#ECFDF5;color:#065F46;border-radius:10px;cursor:pointer;font-weight:700">PRO permanente</button>'
+      +'<button onclick="ebeGenerarCodigo(\'test\')" style="padding:9px 14px;border:1px solid #E2E8F4;background:#F8FAFC;border-radius:10px;cursor:pointer;font-weight:600">Test 10 min</button>'
+    +'</div>'
+    +'<div id="ebe-newcode"></div>'
+    +'<div style="font-weight:700;margin:18px 0 8px">Códigos generados</div>'
+    +'<div id="ebe-codelist" style="font-size:13px;color:#64748B">Cargando...</div>'
+    +'<div style="margin-top:16px"><a href="#" onclick="(_ebeAuthInst()||{}).signOut&&_ebeAuthInst().signOut();return false;" style="color:#94A3B8;font-size:13px">Cerrar sesión</a></div></div>';
+  ebeCargarCodigos();
+}
+function ebeGenerarCodigo(tipo){
+  var code, now=new Date();
+  if(tipo==='test'){ var em=Math.floor((Date.now()+10*60000)/60000).toString(); code='TEST-'+em+'-'+_ebeHash(em+'TEST'+_EBE_LS); }
+  else if(tipo==='pro'){ var id=Math.random().toString(36).slice(2,8).toUpperCase(); code='PRO-'+id+'-'+_ebeHash(id+'PRO'+_EBE_LS); }
+  else{
+    var days=tipo==='trial'?30:tipo==='anual'?365:8;
+    var exp=new Date(now.getTime()+days*86400000);
+    var ds=exp.getFullYear().toString()+String(exp.getMonth()+1).padStart(2,'0')+String(exp.getDate()).padStart(2,'0');
+    var uniq=ds+Date.now().toString(36).toUpperCase().slice(-3)+Math.random().toString(36).slice(2,5).toUpperCase();
+    var pre=tipo==='trial'?'TRIAL':tipo==='anual'?'ANUAL':'DEMO';
+    code=pre+'-'+uniq+'-'+_ebeHash(uniq+_EBE_LS);
+  }
+  var fs=window.__ebeFS; if(!fs){ alert('Firebase no disponible'); return; }
+  var codeKey='code_LIC_'+code.replace(/[^A-Z0-9]/g,'_');
+  fs.collection('ebe_users').doc(codeKey).set({code:code,tipo:tipo,generadoEn:new Date().toISOString(),used:false,createdByAdmin:true},{merge:true})
+    .then(function(){
+      document.getElementById('ebe-newcode').innerHTML='<div style="background:#ECFDF5;border:1px solid #10B981;border-radius:10px;padding:12px;display:flex;align-items:center;justify-content:space-between;gap:10px"><span style="font-family:monospace;font-weight:700;font-size:15px">'+_ebeEsc(code)+'</span><button onclick="navigator.clipboard.writeText(\''+code+'\')" style="padding:6px 12px;background:#10B981;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:600">Copiar</button></div>';
+      ebeCargarCodigos();
+    }).catch(function(e){ alert('No se pudo guardar: '+(e.message||e)); });
+}
+function ebeCargarCodigos(){
+  var fs=window.__ebeFS, el=document.getElementById('ebe-codelist'); if(!fs||!el) return;
+  fs.collection('ebe_users').get().then(function(snap){
+    var rows=[];
+    snap.forEach(function(d){ if(d.id.indexOf('code_LIC_')!==0) return; var x=d.data(); rows.push(x); });
+    rows.sort(function(a,b){ return (b.generadoEn||'').localeCompare(a.generadoEn||''); });
+    if(!rows.length){ el.innerHTML='Aún no has generado códigos.'; return; }
+    el.innerHTML=rows.map(function(x){
+      var usado=x.used;
+      var info=usado?('✖ Activado'+(x.usedByUser?' por: '+_ebeEsc(x.usedByUser):'')+(x.usedClientId?' · negocio: '+_ebeEsc(x.usedClientId):'')):'✔ Disponible';
+      return '<div style="border:1px solid '+(usado?'#FCA5A5':'#6EE7B7')+';background:'+(usado?'#FFF5F5':'#F0FDF4')+';border-radius:10px;padding:8px 12px;margin-bottom:6px"><span style="font-family:monospace;font-weight:700">'+_ebeEsc(x.code||'')+'</span> <span style="font-size:11px;color:'+(usado?'#EF4444':'#10B981')+';font-weight:600">'+info+'</span></div>';
+    }).join('');
+  }).catch(function(e){ el.innerHTML='Error cargando códigos: '+_ebeEsc(e.message||''); });
+}
+
+// ─── Arranque: panel admin o restauración de sesión ─────────────────────────
+document.addEventListener('DOMContentLoaded',function(){
+  if(window.location.search.indexOf('admin=ebenezer')>=0){ ebeInitAdminPanel(); return; }
+  _ebeRestoreSession();
+});
+</script>
 
 <script>
 // ═══════════════════════════════════════════
@@ -2374,7 +2929,7 @@ function undo(){
   historialIdx--;
   db=JSON.parse(historial[historialIdx].estado);
   _migrateDb();
-  localStorage.setItem('te4_db',JSON.stringify(db));
+  localStorage.setItem(_sk('db'),JSON.stringify(db));
   _saveHistorial();
   refreshAll();
   let desc=historial[historialIdx+1]?.desc||'';
@@ -2386,7 +2941,7 @@ function redo(){
   historialIdx++;
   db=JSON.parse(historial[historialIdx].estado);
   _migrateDb();
-  localStorage.setItem('te4_db',JSON.stringify(db));
+  localStorage.setItem(_sk('db'),JSON.stringify(db));
   _saveHistorial();
   refreshAll();
   let desc=historial[historialIdx]?.desc||'';
@@ -2410,12 +2965,12 @@ function _updateUndoRedoBtns(){
 }
 
 function _saveHistorial(){
-  try{localStorage.setItem('te4_hist',JSON.stringify({historial,historialIdx}));}catch(e){}
+  try{localStorage.setItem(_sk('hist'),JSON.stringify({historial,historialIdx}));}catch(e){}
 }
 
 function _loadHistorial(){
   try{
-    let h=localStorage.getItem('te4_hist');
+    let h=localStorage.getItem(_sk('hist'));
     if(h){let p=JSON.parse(h);historial=p.historial||[];historialIdx=p.historialIdx??-1;}
   }catch(e){}
 }
@@ -2433,6 +2988,19 @@ if(!_sessionId){ _sessionId = Math.random().toString(36).slice(2,10); localStora
 var _lastLocalSaveTs = 0;
 var _fbUnsubscribe = null;
 
+// Avisar al usuario cuando Firebase rechaza el acceso (antes fallaba en silencio)
+var _permErrorShown = false;
+function _notifySyncError(e){
+  var sd=document.getElementById('sync-dot');var sl=document.getElementById('sync-label');
+  if(sd){sd.style.background='#DC2626';sd.style.boxShadow='0 0 6px #DC2626';}
+  if(sl) sl.textContent='Sin nube ⚠️';
+  var msg=String((e&&(e.code||e.message))||'').toLowerCase();
+  if(msg.indexOf('permission')>-1 && !_permErrorShown){
+    _permErrorShown=true;
+    try{ toast('⚠️ La nube rechazó el acceso. Los datos se están guardando SOLO en este dispositivo. Verifica tu sesión (Cuenta / Licencia) y las reglas de Firebase.','info'); }catch(e2){}
+  }
+}
+
 
 
 
@@ -2441,6 +3009,7 @@ var _originalSave = typeof save === 'function' ? save : null;
 
 function save(desc=''){
   try{
+    _ebeSanitizeDb();   // anti-XSS: ningún dato guardado puede inyectar HTML
     snapshot(desc);
     const payload=JSON.stringify(db);
     const ts = Date.now();
@@ -2455,66 +3024,46 @@ function save(desc=''){
       return;
     }
 
-    // ══ FIREBASE PRIMERO ══════════════════════════════════════════════════════
-    // Si hay internet → subir a Firebase PRIMERO, localStorage como respaldo
-    // Si no hay internet → guardar en localStorage y sincronizar después
+    // ══ GUARDADO LOCAL SIEMPRE PRIMERO ════════════════════════════════════════
+    // localStorage es el respaldo permanente — NUNCA se borra.
+    // Firebase es la copia en la nube para sincronizar entre dispositivos.
+    try{
+      localStorage.setItem(_sk('db'), payload);
+      localStorage.setItem(_sk('ts'), ts.toString());
+      localStorage.setItem('te4_sid', _sessionId);
+      localStorage.setItem(_sk('pending'), '1');
+    }catch(e2){ console.error('[EBE] Sin espacio en localStorage:', e2); }
+
     if(window.__ebeFirebaseOK && window.__ebeDB && navigator.onLine){
-      // ✅ CON INTERNET: Firebase es el único almacenamiento
-      // localStorage NO se usa para no llenar el caché
       window.__ebeDB.set({
         appData: payload,
         updatedAt: new Date().toISOString(),
-        savedBy: _sessionId
+        savedBy: _sessionId,
+        ownerUid: window.__ebeUid||null,
+        clientId: window.__ebeClientId||null
       }).then(function(){
-        // Firebase OK → solo guardar el timestamp mínimo en localStorage
-        // NO guardar los datos completos para no llenar el caché
-        try{
-          localStorage.setItem('te4_db_ts', ts.toString());
-          localStorage.setItem('te4_sid', _sessionId);
-          localStorage.removeItem('ebe_pending_sync');
-          // Limpiar datos del localStorage ya que Firebase los tiene
-          localStorage.removeItem('te4_db');
-        }catch(e2){}
+        try{ localStorage.removeItem(_sk('pending')); }catch(e2){}
         var sd=document.getElementById('sync-dot');var sl=document.getElementById('sync-label');
         if(sd){sd.style.background='#10B981';sd.style.boxShadow='0 0 6px #10B981';}
         if(sl) sl.textContent='Sincronizado ☁️';
-        console.log('[EBE] ✅ Guardado en Firebase — localStorage liberado');
-        let el2=document.getElementById('save-status');
-        if(el2){ el2.textContent='☁️ Guardado en nube'; el2.style.color='var(--accent)'; clearTimeout(el2._t); el2._t=setTimeout(()=>{el2.textContent='💾 Datos guardados';el2.style.color='';},1800); }
+        console.log('[EBE] ✅ Guardado en Firebase y en localStorage');
+        _setSaveStatus('☁️ Guardado en nube','var(--accent)');
       }).catch(function(e){
-        // Firebase falló → guardar en localStorage como emergencia
-        console.warn('[EBE] Firebase falló — respaldo en localStorage:', e);
-        try{
-          localStorage.setItem('te4_db', payload);
-          localStorage.setItem('te4_db_ts', ts.toString());
-          localStorage.setItem('te4_sid', _sessionId);
-          localStorage.setItem('ebe_pending_sync', '1');
-        }catch(e2){ console.error('[EBE] Sin espacio en localStorage'); }
+        // Firebase falló → los datos YA están seguros en localStorage
+        console.warn('[EBE] Firebase falló — datos seguros en localStorage:', e);
+        _notifySyncError(e);
       });
-      let el=document.getElementById('save-status');
-      if(el){ el.textContent='☁️ Guardando...'; el.style.color='#94A3B8'; }
+      _setSaveStatus('☁️ Guardando...','#94A3B8');
+    } else if(!navigator.onLine){
+      console.warn('[EBE] Sin internet — guardado local, se sincronizará al reconectar');
+      _setSaveStatus('✅ Guardado (sin internet)','var(--accent)');
     } else {
-      // ⚠️ SIN INTERNET: guardar en localStorage como emergencia
-      try{
-        localStorage.setItem('te4_db', payload);
-        localStorage.setItem('te4_db_ts', ts.toString());
-        localStorage.setItem('te4_sid', _sessionId);
-        localStorage.setItem('ebe_pending_sync', '1');
-        console.warn('[EBE] Sin internet — guardado local temporalmente');
-      }catch(e2){ console.error('[EBE] Sin espacio en localStorage y sin internet'); }
-    }
-    let el=document.getElementById('save-status');
-    if(el){
-      el.textContent='✅ Guardado';
-      el.style.color='var(--accent)';
-      clearTimeout(el._t);
-      el._t=setTimeout(()=>{el.textContent='💾 Datos guardados';el.style.color='';},1800);
+      _setSaveStatus('✅ Guardado','var(--accent)');
     }
     _updateTopbarDeuda();
 
   }catch(e){
-    let el=document.getElementById('save-status');
-    if(el){el.textContent='⚠️ Error al guardar';el.style.color='var(--red)';}
+    _setSaveStatus('⚠️ Error al guardar','var(--red)');
     console.error('Error guardando:',e);
   }
 }
@@ -2523,17 +3072,19 @@ function save(desc=''){
 
 // Auto-sync cuando vuelve el internet
 window.addEventListener('online', function(){
-  var pending = localStorage.getItem('ebe_pending_sync');
+  var pending = localStorage.getItem(_sk('pending'));
   if(!pending || !window.__ebeFirebaseOK || !window.__ebeDB) return;
   try {
-    var raw = localStorage.getItem('te4_db');
+    var raw = localStorage.getItem(_sk('db'));
     if(!raw) return;
     window.__ebeDB.set({
       appData: raw,
       updatedAt: new Date().toISOString(),
-      savedBy: _sessionId
+      savedBy: _sessionId,
+      ownerUid: window.__ebeUid||null,
+      clientId: window.__ebeClientId||null
     }).then(function(){
-      localStorage.removeItem('ebe_pending_sync');
+      localStorage.removeItem(_sk('pending'));
       console.log('[EBE] ✅ Datos sincronizados automáticamente');
     }).catch(function(){});
   } catch(e){}
@@ -2541,23 +3092,51 @@ window.addEventListener('online', function(){
 
 // Verificar sync pendiente al cargar
 setTimeout(function(){
-  var pending = localStorage.getItem('ebe_pending_sync');
+  var pending = localStorage.getItem(_sk('pending'));
   if(pending && navigator.onLine && window.__ebeFirebaseOK && window.__ebeDB){
     try {
-      var raw = localStorage.getItem('te4_db');
+      var raw = localStorage.getItem(_sk('db'));
       if(raw){
         window.__ebeDB.set({
           appData: raw,
           updatedAt: new Date().toISOString(),
-          savedBy: _sessionId
+          savedBy: _sessionId,
+          ownerUid: window.__ebeUid||null,
+          clientId: window.__ebeClientId||null
         }).then(function(){
-          localStorage.removeItem('ebe_pending_sync');
+          localStorage.removeItem(_sk('pending'));
           console.log('[EBE] ✅ Sync pendiente completado');
         }).catch(function(){});
       }
     } catch(e){}
   }
 }, 3000);
+
+// Migración ÚNICA: adopta los datos de la nube de la versión anterior sin login
+// (ebenezer/main) hacia el doc del negocio actual. Solo el negocio que reclamó
+// los datos locales legados (o el admin) puede adoptarlos.
+var _ebeLegacyMigrado=false;
+function _ebeIntentarMigracionNube(){
+  if(_ebeLegacyMigrado) return; _ebeLegacyMigrado=true;
+  try{
+    if(!window.__ebeLegacyDB) return;
+    var claimed=localStorage.getItem('ebe_legacy_claimed');
+    if(claimed!==window.__ebeClientId && !_ebeIsAdminUid(_ebeCurrentUid())) return;
+    window.__ebeLegacyDB.get().then(function(doc){
+      if(!doc.exists||!doc.data()||!doc.data().appData) return;
+      var parsed=null; try{ parsed=JSON.parse(doc.data().appData); }catch(e){ return; }
+      if(!parsed||!Array.isArray(parsed.clientes)) return;
+      var tot=(parsed.clientes||[]).length+(parsed.movimientos||[]).length;
+      var localTot=(db.clientes||[]).length+(db.movimientos||[]).length;
+      if(tot===0||localTot>0) return; // solo si el negocio actual está vacío
+      db=parsed; _migrateDb();
+      save('Primera sincronización con Firebase');
+      refreshAll();
+      console.log('[EBE] ✅ Datos migrados desde la nube de la versión anterior:',tot,'registros');
+      try{ toast('✅ Datos recuperados de la nube ('+tot+' registros)'); }catch(e){}
+    }).catch(function(e){ console.warn('[EBE] No se pudo leer la nube anterior:',e); });
+  }catch(e){}
+}
 
 function _initFirebaseSync(){
   if(!window.__ebeFirebaseOK || !window.__ebeDB) return;
@@ -2581,7 +3160,7 @@ function _initFirebaseSync(){
           }
         }
       }catch(e){ console.warn('[EBE] Error cargando Firebase inicial:', e); }
-    }).catch(function(){});
+    }).catch(function(e){ console.warn('[EBE] No se pudo leer Firebase al iniciar:', e); _notifySyncError(e); });
   }
   // Cancelar listener anterior si existe
   if(_fbUnsubscribe) { try { _fbUnsubscribe(); } catch(e){} }
@@ -2594,6 +3173,9 @@ function _initFirebaseSync(){
       // Firebase vacío — si tenemos datos locales, subirlos
       if(!_dbVacio){
         save('Primera sincronización con Firebase');
+      } else {
+        // Sin datos locales ni en la nube nueva: intentar migrar la nube antigua
+        _ebeIntentarMigracionNube();
       }
       return;
     }
@@ -2609,8 +3191,8 @@ function _initFirebaseSync(){
         if(fbTotal > 0){
           db = parsed;
           _migrateDb();
-          localStorage.setItem('te4_db', JSON.stringify(parsed));
-          localStorage.setItem('te4_db_ts', fbTs.toString());
+          localStorage.setItem(_sk('db'), JSON.stringify(parsed));
+          localStorage.setItem(_sk('ts'), fbTs.toString());
           _lastLocalSaveTs = fbTs;
           refreshAll();
           console.log('[EBE] ✅ Datos restaurados desde Firebase:', (parsed.clientes||[]).length, 'clientes,', (parsed.movimientos||[]).length, 'movimientos');
@@ -2651,14 +3233,14 @@ function _initFirebaseSync(){
       if(parsed && Array.isArray(parsed.clientes)){
         db = parsed;
         _migrateDb();
-        localStorage.setItem('te4_db', JSON.stringify(parsed));
-        localStorage.setItem('te4_db_ts', fbTs.toString());
+        localStorage.setItem(_sk('db'), JSON.stringify(parsed));
+        localStorage.setItem(_sk('ts'), fbTs.toString());
         _lastLocalSaveTs = fbTs;
         refreshAll();
         console.log('🔄 Datos sincronizados desde otro dispositivo');
       }
     }catch(e){ console.warn('Error aplicando sync Firebase:', e); }
-  }, function(err){ console.warn('Error listener Firebase:', err); });
+  }, function(err){ console.warn('Error listener Firebase:', err); _notifySyncError(err); });
 }
 
 function _updateTopbarDeuda(){
@@ -2673,27 +3255,58 @@ function load(){
   _loadHistorial();
   // 1. Intentar localStorage con clave principal
   try{
-    let r=localStorage.getItem('te4_db');
-    let ts=localStorage.getItem('te4_db_ts');
+    let r=localStorage.getItem(_sk('db'));
+    let ts=localStorage.getItem(_sk('ts'));
     if(r){
       let parsed=JSON.parse(r);
       if(parsed && Array.isArray(parsed.clientes)){
-        db=parsed;
-        _migrateDb();
-        console.log('[DB] Cargado desde localStorage — ts:',ts?new Date(parseInt(ts)).toLocaleString():'—',`(${db.clientes.length} clientes, ${db.movimientos.length} movs)`);
-        // Usar timestamp real del localStorage (no Date.now())
-        // Así Firebase puede ganar si tiene datos más recientes de otro dispositivo
-        _lastLocalSaveTs = ts ? parseInt(ts) : 0;
-        _initFirebaseSync();
-        return true;
+        let tieneDatos=parsed.clientes.length>0 || (parsed.movimientos||[]).length>0;
+        if(tieneDatos){
+          db=parsed;
+          _migrateDb();
+          console.log('[DB] Cargado desde localStorage — ts:',ts?new Date(parseInt(ts)).toLocaleString():'—',`(${db.clientes.length} clientes, ${db.movimientos.length} movs)`);
+          // Usar timestamp real del localStorage (no Date.now())
+          // Así Firebase puede ganar si tiene datos más recientes de otro dispositivo
+          _lastLocalSaveTs = ts ? parseInt(ts) : 0;
+          _initFirebaseSync();
+          return true;
+        }
+        // te4_db existe pero está VACÍO (posible seed() accidental tras un fallo
+        // de la nube) — NO lo aceptamos: intentamos recuperar del historial abajo.
+        console.warn('[DB] te4_db existe pero está vacío — buscando datos en el historial');
       }
     }
   }catch(e){console.warn('[DB] Error leyendo te4_db:',e);}
+  // 1.5 RECUPERACIÓN: buscar en el historial de deshacer (te4_hist)
+  // El historial guarda copias completas de la base de datos y sobrevive
+  // aunque te4_db se haya perdido. Restauramos la copia más reciente con datos.
+  try{
+    let h=localStorage.getItem(_sk('hist'));
+    if(h){
+      let p=JSON.parse(h);
+      let snaps=Array.isArray(p.historial)?p.historial:[];
+      for(let i=snaps.length-1;i>=0;i--){
+        let est=null;
+        try{ est=JSON.parse(snaps[i].estado); }catch(e2){ continue; }
+        if(est && Array.isArray(est.clientes) && (est.clientes.length>0 || (est.movimientos||[]).length>0)){
+          db=est;
+          _migrateDb();
+          localStorage.setItem(_sk('db'),JSON.stringify(db));
+          localStorage.setItem(_sk('ts'),(snaps[i].ts||Date.now()).toString());
+          _lastLocalSaveTs=snaps[i].ts||Date.now();
+          console.log('[DB] ✅ DATOS RECUPERADOS del historial:',db.clientes.length,'clientes,',db.movimientos.length,'movimientos —',snaps[i].desc||'');
+          setTimeout(()=>{try{toast(`✅ Datos recuperados del historial: ${db.clientes.length} clientes, ${db.movimientos.length} movimientos. Haz un respaldo JSON ahora.`);}catch(e3){}},1200);
+          _initFirebaseSync();
+          return true;
+        }
+      }
+    }
+  }catch(e){console.warn('[DB] Error recuperando desde te4_hist:',e);}
   // 2. Intentar claves antiguas
   try{
-    let keys=['te4_hist','tc3_db','tc2_db'];
+    let keys=[_sk('hist'),'tc3_db','tc2_db'];
     for(let k of keys){
-      if(k==='te4_hist') continue;
+      if(k===_sk('hist')) continue;
       let r2=localStorage.getItem(k);
       if(r2){
         let old=JSON.parse(r2);
@@ -2723,7 +3336,7 @@ function load(){
 function seed(){
   // Sin datos demo — arranca completamente limpio
   db = {clientes:[],movimientos:[],liquidaciones:[],nci:1,nmi:1,nli:1};
-  try{ localStorage.setItem('te4_db', JSON.stringify(db)); }catch(e){}
+  try{ localStorage.setItem(_sk('db'), JSON.stringify(db)); }catch(e){}
   console.log('[DB] Software listo — base de datos vacía');
 }
 
@@ -3992,9 +4605,9 @@ function exportarHTML(){
   try{
     var embedded=${datosJSON};
     // Solo usar los datos embebidos si localStorage está vacío o es más antiguo
-    var local=localStorage.getItem('te4_db');
+    var local=localStorage.getItem('te4'+'_db');
     if(!local){
-      localStorage.setItem('te4_db',JSON.stringify(embedded));
+      localStorage.setItem('te4'+'_db',JSON.stringify(embedded));
     }
   }catch(e){}
 })();
@@ -4156,8 +4769,8 @@ function cerrarAlertaBackup(){
 // DIAGNÓSTICO DE ALMACENAMIENTO
 // ═══════════════════════════════════════════
 function diagnosticarStorage(){
-  let ts=localStorage.getItem('te4_db_ts');
-  let raw=localStorage.getItem('te4_db');
+  let ts=localStorage.getItem(_sk('ts'));
+  let raw=localStorage.getItem(_sk('db'));
   let tamano=raw?Math.round(raw.length/1024)+' KB':'0 KB';
   let ultimoGuardado=ts?new Date(parseInt(ts)).toLocaleString('es-CO'):'Nunca';
   let parsed=null;try{parsed=raw?JSON.parse(raw):null;}catch(e){}
@@ -4197,6 +4810,13 @@ document.addEventListener('DOMContentLoaded',()=>{
   // Set default month filter to current month
   let pdMes=document.getElementById('pd-mes-filter');
   if(pdMes)pdMes.value=today().slice(0,7);
+});
+
+// ── ARRANQUE DE DATOS: solo tras iniciar sesión (lo llama ebeEnterApp) ──────
+var _ebeAppStarted=false;
+function _ebeStartApp(){
+  if(_ebeAppStarted){ try{ refreshAll(); }catch(e){} return; }
+  _ebeAppStarted=true;
   if(!load()){
     // Sin datos locales — SIEMPRE buscar en Firebase primero
     // NUNCA iniciar con datos demo si puede haber datos reales en Firebase
@@ -4211,10 +4831,10 @@ document.addEventListener('DOMContentLoaded',()=>{
             if(parsed && Array.isArray(parsed.clientes)){
               db = parsed;
               _migrateDb();
-              localStorage.setItem('te4_db', JSON.stringify(parsed));
+              localStorage.setItem(_sk('db'), JSON.stringify(parsed));
               var fbTs = doc.data().updatedAt ? new Date(doc.data().updatedAt).getTime() : Date.now();
-              localStorage.setItem('te4_db_ts', fbTs.toString());
-              _lastLocalSaveTs = Date.now();
+              localStorage.setItem(_sk('ts'), fbTs.toString());
+              _lastLocalSaveTs = fbTs;
               _initFirebaseSync();
               renderDash();
               _updateTopbarDeuda();
@@ -4235,6 +4855,7 @@ document.addEventListener('DOMContentLoaded',()=>{
         if(loadingEl) loadingEl.textContent = '💾 Datos guardados';
       }).catch(function(e){
         console.warn('[DB] Firebase no disponible al iniciar:', e);
+        _notifySyncError(e);
         // Sin Firebase — iniciar vacío, NO demo data
         seed();
         renderDash();
@@ -4249,7 +4870,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   renderDash();
   _updateTopbarDeuda();
   checkBackupReminder();
-});
+}
 
 // ═══════════════════════════════════════════
 // TECLADO — Atajos Ctrl+Z / Ctrl+Y
@@ -4271,7 +4892,10 @@ const CACHE='eben-ezer-assets-v1';
 const ASSETS=[
   'https://fonts.googleapis.com/css2?family=DM+Sans:wght@600;700;800&family=Inter:wght@300;400;500;600;700&display=swap',
   'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js',
-  'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'
+  'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js',
+  'https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js',
+  'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js',
+  'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js'
 ];
 self.addEventListener('install',e=>{
   e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS).catch(()=>{})));
