@@ -15,7 +15,7 @@
     'ventas.crear': 'Registrar ventas',
     'ventas.precio': 'Cambiar el precio durante la venta',
     'ventas.descuento': 'Dar descuentos por encima del límite',
-    'ventas.anular': 'Anular ventas',
+    'ventas.anular': 'Anular ventas y hacer devoluciones',
     'ventas.sinstock': 'Vender sin existencias',
     'clientes.editar': 'Crear y editar clientes',
     'clientes.cupo': 'Fiar por encima del cupo',

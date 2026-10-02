@@ -30,7 +30,10 @@ La primera vez pide el nombre de la tienda y crea el usuario administrador.
 | **Inventario** | Productos con foto, código, categoría, costo, precio, IVA, mínimo y vencimiento. Kárdex por producto. Ajustes con motivo. Importar / exportar CSV. |
 | **Foto con IA** | Tome una foto de los productos o del estante y la IA propone nombre, marca, categoría, cantidad y precio, y recorta la foto de cada uno. Usted revisa y guarda. Detecta si el producto ya existe para no duplicarlo. |
 | **Factura con IA** | Tome una foto de la factura del proveedor: la IA lee productos, cantidades y costos y arma la compra. Compara el total con el de la factura. |
-| **Compras** | Compras a proveedores (pagada, con plata de la caja o a crédito), cuentas por pagar, costo promedio. |
+| **Compras** | Compras a proveedores (pagada, con plata de la caja o a crédito), cuentas por pagar, costo promedio. Se pueden digitar por paca o caja. |
+| **Pedido sugerido** | Compras → Pedido sugerido: qué pedir a cada proveedor según lo vendido en 4 semanas y el mínimo de cada producto; se envía por WhatsApp y, cuando llega, se registra como compra con un clic. |
+| **Presentaciones** | Un producto puede venderse por unidad, six-pack, paca o caja, cada una con su precio y código. El inventario siempre se lleva en unidades. |
+| **Devoluciones** | Desde Caja o Reportes → Devolución: el cliente devuelve algunos productos; vuelven al inventario y el dinero se descuenta primero de lo fiado y el resto sale en efectivo. |
 | **Clientes y fiados** | Cupo por cliente, cuenta detallada, abonos, cobro por WhatsApp. |
 | **Caja** | Apertura con base, gastos, ingresos, retiros, cierre con arqueo (faltante / sobrante) e impresión del cierre. |
 | **Reportes** | Ventas, utilidad, medios de pago, categorías, vendedores, productos más vendidos; anular ventas; exportar. |

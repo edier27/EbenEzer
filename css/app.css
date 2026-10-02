@@ -272,6 +272,7 @@ a.chip:hover { border-color: var(--borde2); }
 .metodos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 12px 0; }
 .metodos button { padding: 11px 6px; border: 1px solid var(--borde2); border-radius: var(--r2); background: var(--panel); cursor: pointer; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 8px; }
 .metodos button:hover { border-color: var(--tenue); }
+.lista-pres button { justify-content: space-between; padding: 12px 14px; }
 .metodos button.activo { background: var(--tinta); border-color: var(--tinta); color: #fff; }
 :root[data-tema="oscuro"] .metodos button.activo { background: var(--pri-suave); border-color: var(--pri); color: var(--pri2); }
 .billetes { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }

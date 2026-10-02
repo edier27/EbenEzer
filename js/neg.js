@@ -37,8 +37,24 @@
     if (p.precio < 0 || p.costo < 0) throw new Error(`"${p.nombre}": precio y costo no pueden ser negativos`);
     if (T.regla('bloquearBajoCosto') && p.costo > 0 && p.precio < p.costo)
       throw new Error(`"${p.nombre}": el precio (${T.money(p.precio)}) es menor que el costo (${T.money(p.costo)})`);
-    if (p.codigo && [...D().lista('productos'), ...otros].some(x => x.codigo === p.codigo && x.id !== p.id))
-      throw new Error(`El código ${p.codigo} ya lo tiene otro producto`);
+    // Códigos únicos entre productos y presentaciones (paca, six-pack…).
+    const ajenos = new Set();
+    for (const x of [...D().lista('productos'), ...otros]) {
+      if (x.id === p.id) continue;
+      if (x.codigo) ajenos.add(x.codigo);
+      (x.presentaciones || []).forEach(pr => { if (pr.codigo) ajenos.add(pr.codigo); });
+    }
+    if (p.codigo && ajenos.has(p.codigo)) throw new Error(`El código ${p.codigo} ya lo tiene otro producto`);
+    const propios = new Set(p.codigo ? [p.codigo] : []);
+    for (const pr of p.presentaciones || []) {
+      if (!pr.nombre) throw new Error(`"${p.nombre}": cada presentación necesita nombre (ej. Paca x 24)`);
+      if (!(pr.factor > 1)) throw new Error(`"${p.nombre}": la presentación "${pr.nombre}" debe traer más de 1 unidad`);
+      if (!(pr.precio > 0)) throw new Error(`"${p.nombre}": falta el precio de "${pr.nombre}"`);
+      if (T.regla('bloquearBajoCosto') && p.costo > 0 && pr.precio < p.costo * pr.factor)
+        throw new Error(`"${p.nombre}": el precio de "${pr.nombre}" (${T.money(pr.precio)}) es menor que su costo (${T.money(p.costo * pr.factor)})`);
+      if (pr.codigo && (ajenos.has(pr.codigo) || propios.has(pr.codigo))) throw new Error(`El código ${pr.codigo} está repetido`);
+      if (pr.codigo) propios.add(pr.codigo);
+    }
   }
 
   const cambios = (a, b, omitir = ['foto', 'actualizado', 'creado']) => {
@@ -60,6 +76,17 @@
       if (monto > hay) throw new Error(`En la caja solo hay ${T.money(hay)} en efectivo; no alcanza para sacar ${T.money(monto)}`);
     },
     buscarCodigo: cod => cod ? D().lista('productos').find(p => p.codigo === cod && p.activo !== false) || null : null,
+    // Igual, pero también reconoce el código de una presentación. Devuelve {p, pres} o null.
+    porCodigo(cod) {
+      if (!cod) return null;
+      for (const p of D().lista('productos')) {
+        if (p.activo === false) continue;
+        if (p.codigo === cod) return { p, pres: null };
+        const pres = (p.presentaciones || []).find(x => x.codigo === cod);
+        if (pres) return { p, pres };
+      }
+      return null;
+    },
     precioSugerido: costo => { const r = T.regla('redondeo') || 1; return Math.ceil(costo * (1 + T.regla('margenDefecto') / 100) / r) * r; },
 
     // ── Productos ──
@@ -94,7 +121,8 @@
     },
 
     // ── Ventas ──
-    // items: [{productoId, cantidad, precio, descuento}]  pagos: [{metodo, monto}] (montos aplicados; suman el total)
+    // items: [{productoId, presId?, cantidad, precio, descuento}]  pagos: [{metodo, monto}] (montos aplicados; suman el total)
+    // Con presId la cantidad va en presentaciones (2 pacas) y el inventario baja cantidad × factor unidades.
     calcular(items) {
       let subtotal = 0, descuento = 0;
       for (const it of items) {
@@ -120,15 +148,21 @@
           prods.set(o.id, p = { ...o, _vend: 0 });
         }
         const cant = T.r3(it.cantidad);
+        const pres = it.presId ? (p.presentaciones || []).find(x => x.id === it.presId) : null;
+        if (it.presId && !pres) throw new Error(`La presentación de "${p.nombre}" ya no existe; quítela de la venta y agréguela de nuevo`);
+        const factor = pres ? pres.factor : 1;
         if (!(cant > 0)) throw new Error(`Cantidad inválida en "${p.nombre}"`);
         if (!(it.precio >= 0)) throw new Error(`Precio inválido en "${p.nombre}"`);
-        p._vend += cant;
+        p._vend = T.r3(p._vend + cant * factor);
         if (!T.regla('venderSinStock') && !sinStock && (p.stock || 0) < p._vend) throw new Error(`No hay suficiente "${p.nombre}" (quedan ${T.cant(p.stock)})`);
         if (T.regla('bloquearVencidos') && p.vence && p.vence < hoy) throw new Error(`"${p.nombre}" está vencido (${T.fechaCorta(p.vence)})`);
         const bruto = T.red(it.precio * cant), desc = Math.min(bruto, T.red(it.descuento || 0)), tot = bruto - desc;
         if (p.iva) impuesto += T.red(tot - tot / (1 + p.iva / 100));
-        costo += T.red((p.costo || 0) * cant);
-        lineas.push({ productoId: p.id, nombre: p.nombre, codigo: p.codigo || '', unidad: p.unidad || 'und', cantidad: cant, precio: it.precio, costo: p.costo || 0, iva: p.iva || 0, descuento: desc, total: tot });
+        costo += T.red((p.costo || 0) * factor * cant);
+        lineas.push({
+          productoId: p.id, nombre: pres ? `${p.nombre} · ${pres.nombre}` : p.nombre, codigo: (pres ? pres.codigo : p.codigo) || '', unidad: pres ? 'und' : p.unidad || 'und',
+          cantidad: cant, precio: it.precio, costo: T.red((p.costo || 0) * factor), iva: p.iva || 0, descuento: desc, total: tot, ...(pres ? { presId: pres.id, factor } : {})
+        });
       }
       const tot = this.calcular(items);
       pagos = (pagos || []).filter(x => x.monto > 0).map(x => ({ metodo: x.metodo, monto: T.red(x.monto) }));
@@ -147,7 +181,7 @@
 
       const numero = await consecutivo('nVenta', 'V');
       const ops = [];
-      lineas.forEach(l => ops.push(movOp(prods.get(l.productoId), 'venta', -l.cantidad, l.costo, numero)));
+      lineas.forEach(l => ops.push(movOp(prods.get(l.productoId), 'venta', -l.cantidad * (l.factor || 1), l.costo / (l.factor || 1), numero)));
       prods.forEach(p => { delete p._vend; ops.push({ s: 'productos', r: p }); });
       const v = {
         id: T.uid(), numero, fecha: Date.now(), items: lineas, ...tot, impuesto, costo, pagos, fiado,
@@ -166,12 +200,13 @@
       if (!motivo) throw new Error('Escriba el motivo de la anulación');
       const o = await D().leer('ventas', id);
       if (!o || o.estado !== 'completada') throw new Error('La venta ya está anulada');
+      if (o.devuelto > 0) throw new Error('Esta venta ya tiene devoluciones. Devuelva los productos que faltan en lugar de anularla.');
       const ops = [], prods = new Map(), caja = this.cajaAbierta();
       for (const l of o.items) {
         const orig = D().get('productos', l.productoId);
         if (!orig) continue;
         if (!prods.has(orig.id)) prods.set(orig.id, { ...orig });
-        ops.push(movOp(prods.get(orig.id), 'anulacion', l.cantidad, l.costo, o.numero, motivo));
+        ops.push(movOp(prods.get(orig.id), 'anulacion', l.cantidad * (l.factor || 1), l.costo / (l.factor || 1), o.numero, motivo));
       }
       prods.forEach(p => ops.push({ s: 'productos', r: p }));
       const efectivo = o.pagos.filter(x => x.metodo === 'efectivo').reduce((a, x) => a + x.monto, 0);
@@ -189,6 +224,49 @@
       ops.push({ s: 'ventas', r: v }, T.aud('venta.anular', o.numero, { total: o.total, motivo, autoriza: autoriza || '' }));
       await D().lote(ops);
       return v;
+    },
+
+    // Devolución de algunos productos de una venta. items: [{i: posición de la línea, cantidad}]
+    // El valor se descuenta primero de lo que quedó fiado en esa venta; el resto sale en efectivo de la caja.
+    async devolver(id, { items, motivo, autoriza }) {
+      if (!motivo) throw new Error('Escriba el motivo de la devolución');
+      const o = await D().leer('ventas', id);
+      if (!o || o.estado !== 'completada') throw new Error('Esa venta está anulada');
+      const caja = this.cajaAbierta(), ops = [], prods = new Map(), lineas = o.items.map(l => ({ ...l })), dev = [];
+      let total = 0, costo = 0;
+      for (const { i, cantidad } of items) {
+        const l = lineas[i], cant = T.r3(cantidad);
+        if (!l || !(cant > 0)) continue;
+        const queda = T.r3(l.cantidad - (l.devuelto || 0));
+        if (cant > queda) throw new Error(`De "${l.nombre}" solo se pueden devolver ${T.cant(queda)}`);
+        const f = l.factor || 1, valor = T.red(l.total / l.cantidad * cant);
+        l.devuelto = T.r3((l.devuelto || 0) + cant);
+        total += valor; costo += T.red(l.costo * cant);
+        dev.push({ productoId: l.productoId, nombre: l.nombre, cantidad: cant, total: valor });
+        const orig = D().get('productos', l.productoId);
+        if (orig) {
+          if (!prods.has(orig.id)) prods.set(orig.id, { ...orig });
+          ops.push(movOp(prods.get(orig.id), 'devolucion', cant * f, l.costo / f, o.numero, motivo));
+        }
+      }
+      if (!dev.length) throw new Error('Indique qué productos se devuelven');
+      total = Math.min(total, o.total - (o.devuelto || 0));
+      const aFiado = o.clienteId ? Math.min(total, (o.fiado || 0) - (o.fiadoDevuelto || 0)) : 0, enEfectivo = total - aFiado;
+      if (enEfectivo > 0) {
+        if (!caja) throw new Error('Abra la caja para devolver el dinero');
+        await this.exigirEfectivo(caja, enEfectivo);
+        ops.push({ s: 'cajaMovs', r: { id: T.uid(), fecha: Date.now(), cajaId: caja.id, tipo: 'devolucion', concepto: `Devolución ${o.numero}`, monto: enEfectivo, ...quien() } });
+      }
+      prods.forEach(p => ops.push({ s: 'productos', r: p }));
+      if (aFiado > 0) {
+        const c = { ...D().get('clientes', o.clienteId) };
+        c.saldo = (c.saldo || 0) - aFiado; ops.push({ s: 'clientes', r: c });
+      }
+      const d = { fecha: Date.now(), items: dev, total, aFiado, enEfectivo, motivo, usuario: T.auth.usuario.nombre, autoriza: autoriza || '', cajaId: caja ? caja.id : null };
+      const v = { ...o, items: lineas, devuelto: (o.devuelto || 0) + total, costoDevuelto: (o.costoDevuelto || 0) + costo, fiadoDevuelto: (o.fiadoDevuelto || 0) + aFiado, devoluciones: [...(o.devoluciones || []), d] };
+      ops.push({ s: 'ventas', r: v }, T.aud('venta.devolver', o.numero, { productos: dev.map(x => `${x.cantidad} × ${x.nombre}`), total, enEfectivo, aFiado, motivo, autoriza: autoriza || '' }));
+      await D().lote(ops);
+      return { venta: v, devolucion: d };
     },
 
     // ── Entradas de mercancía ──
@@ -352,7 +430,7 @@
         const c = D().get('clientes', id);
         if (!c) continue;
         const [ventas, abonos] = await Promise.all([D().porIndice('ventas', 'clienteId', id), D().porIndice('abonos', 'clienteId', id)]);
-        const saldo = ventas.filter(v => v.estado === 'completada').reduce((a, v) => a + (v.fiado || 0), 0) - abonos.reduce((a, x) => a + x.monto, 0);
+        const saldo = ventas.filter(v => v.estado === 'completada').reduce((a, v) => a + (v.fiado || 0) - (v.fiadoDevuelto || 0), 0) - abonos.reduce((a, x) => a + x.monto, 0);
         if (saldo !== (c.saldo || 0)) ops.push({ s: 'clientes', r: { ...c, saldo } });
       }
       await D().lote(ops, { remoto: true });
@@ -368,21 +446,44 @@
         porVencer: prods.filter(p => p.vence && p.vence >= hoy && p.vence <= lim && p.stock > 0)
       };
     },
+    // Qué pedir a los proveedores: lo necesario para cubrir "dias" de venta (según las últimas 4 semanas)
+    // más el mínimo de cada producto, menos lo que hay. Devuelve una fila por producto que haga falta.
+    async sugerirPedido(dias = 15) {
+      const VENTANA = 28, fin = Date.now(), r = await this.resumen(fin - VENTANA * 86400000, fin), out = [];
+      for (const p of D().lista('productos')) {
+        if (p.activo === false) continue;
+        const vendidos = (r.productos[p.id] || {}).cantidad || 0, diario = vendidos / VENTANA, stock = Math.max(0, p.stock || 0);
+        if (!vendidos && !(p.stockMin > 0)) continue;
+        const falta = diario * dias + (p.stockMin || 0) - stock;
+        if (!(falta > 0)) continue;
+        const pres = (p.presentaciones || []).slice().sort((a, b) => b.factor - a.factor)[0] || null;
+        const paquetes = pres ? Math.ceil(falta / pres.factor) : 0, sugerido = pres ? paquetes * pres.factor : Math.ceil(falta);
+        out.push({ p, vendidos: T.r3(vendidos), stock, diasQuedan: diario > 0 ? Math.floor(stock / diario) : null, sugerido, pres, paquetes, costo: T.red(sugerido * (p.costo || 0)) });
+      }
+      return out.sort((a, b) => (a.diasQuedan ?? 999) - (b.diasQuedan ?? 999));
+    },
+
     async resumen(desde, hasta) {
       const [ventas, movs, abonos] = await Promise.all([D().rango('ventas', 'fecha', desde, hasta), D().rango('cajaMovs', 'fecha', desde, hasta), D().rango('abonos', 'fecha', desde, hasta)]);
-      const r = { ventas: [], n: 0, anuladas: 0, total: 0, costo: 0, descuento: 0, impuesto: 0, fiado: 0, gastos: 0, abonos: 0, porMetodo: {}, porDia: {}, porCategoria: {}, porUsuario: {}, productos: {} };
+      // Todas las cifras van netas de devoluciones. Las cantidades por producto van en unidades sueltas.
+      const r = { ventas: [], n: 0, anuladas: 0, total: 0, costo: 0, descuento: 0, impuesto: 0, fiado: 0, devuelto: 0, gastos: 0, abonos: 0, porMetodo: {}, porDia: {}, porCategoria: {}, porUsuario: {}, productos: {} };
       for (const v of ventas) {
         r.ventas.push(v);
         if (v.estado !== 'completada') { r.anuladas++; continue; }
-        r.n++; r.total += v.total; r.costo += v.costo || 0; r.descuento += v.descuento || 0; r.impuesto += v.impuesto || 0; r.fiado += v.fiado || 0;
+        const dv = v.devuelto || 0, fd = v.fiadoDevuelto || 0, neto = v.total - dv;
+        r.n++; r.total += neto; r.costo += (v.costo || 0) - (v.costoDevuelto || 0); r.descuento += v.descuento || 0; r.impuesto += v.impuesto || 0; r.fiado += (v.fiado || 0) - fd; r.devuelto += dv;
         v.pagos.forEach(p => { r.porMetodo[p.metodo] = (r.porMetodo[p.metodo] || 0) + p.monto; });
-        const d = T.dia(v.fecha); r.porDia[d] = (r.porDia[d] || 0) + v.total;
-        r.porUsuario[v.usuario] = (r.porUsuario[v.usuario] || 0) + v.total;
+        if (fd) r.porMetodo.fiado -= fd;
+        if (dv - fd) r.porMetodo.efectivo = (r.porMetodo.efectivo || 0) - (dv - fd);   // lo devuelto en plata sale del efectivo
+        const d = T.dia(v.fecha); r.porDia[d] = (r.porDia[d] || 0) + neto;
+        r.porUsuario[v.usuario] = (r.porUsuario[v.usuario] || 0) + neto;
         for (const l of v.items) {
-          const p = D().get('productos', l.productoId), cat = (p && p.categoria) || 'Sin categoría';
-          r.porCategoria[cat] = (r.porCategoria[cat] || 0) + l.total;
-          const x = r.productos[l.productoId] = r.productos[l.productoId] || { nombre: l.nombre, cantidad: 0, total: 0, utilidad: 0 };
-          x.cantidad = T.r3(x.cantidad + l.cantidad); x.total += l.total; x.utilidad += l.total - T.red(l.costo * l.cantidad);
+          const queda = T.r3(l.cantidad - (l.devuelto || 0));
+          if (!(queda > 0)) continue;
+          const p = D().get('productos', l.productoId), cat = (p && p.categoria) || 'Sin categoría', tl = T.red(l.total / l.cantidad * queda);
+          r.porCategoria[cat] = (r.porCategoria[cat] || 0) + tl;
+          const x = r.productos[l.productoId] = r.productos[l.productoId] || { nombre: p ? p.nombre : l.nombre, cantidad: 0, total: 0, utilidad: 0 };
+          x.cantidad = T.r3(x.cantidad + queda * (l.factor || 1)); x.total += tl; x.utilidad += tl - T.red(l.costo * queda);
         }
       }
       movs.forEach(m => { if (m.tipo === 'gasto') r.gastos += m.monto; });

@@ -8,7 +8,8 @@
 
   const guardar = () => T.db.setLoc('carrito', { carrito, clienteId });
   const totales = () => T.neg.calcular(carrito);
-  const cantEnCarrito = id => carrito.filter(l => l.productoId === id).reduce((a, l) => a + l.cantidad, 0);
+  // En unidades sueltas: una paca de 24 cuenta 24.
+  const cantEnCarrito = id => carrito.filter(l => l.productoId === id).reduce((a, l) => a + l.cantidad * (l.factor || 1), 0);
 
   // ── Recibo ──
   T.ui.reciboHTML = v => {
@@ -26,7 +27,10 @@
         ${v.impuesto ? `<tr><td>IVA incluido</td><td>${T.num(v.impuesto)}</td></tr>` : ''}
         ${v.pagos.map(p => `<tr><td>${T.METODOS[p.metodo]}</td><td>${T.num(p.monto)}</td></tr>`).join('')}
         ${v.cambio ? `<tr><td>Recibido</td><td>${T.num(v.recibido)}</td></tr><tr><td>Cambio</td><td>${T.num(v.cambio)}</td></tr>` : ''}
-      </table><hr><div class="c">${T.esc(n.pie || '')}</div></div>`;
+      </table>
+      ${(v.devoluciones || []).map(d => `<hr><div>DEVOLUCIÓN ${T.fechaHora(d.fecha)}</div><table>${d.items.map(x => `<tr><td>${T.cant(x.cantidad)} × ${T.esc(x.nombre)}</td><td>−${T.num(x.total)}</td></tr>`).join('')}</table>`).join('')}
+      ${v.devuelto ? `<table><tr class="t"><td>TOTAL NETO</td><td>${T.money(v.total - v.devuelto)}</td></tr></table>` : ''}
+      <hr><div class="c">${T.esc(n.pie || '')}</div></div>`;
   };
   T.ui.verRecibo = (v, { nueva } = {}) => {
     const cli = v.clienteId && T.db.get('clientes', v.clienteId), tel = cli && String(cli.telefono || '').replace(/\D/g, '');
@@ -99,7 +103,7 @@
         T.$('#prods', el).innerHTML = lista.length ? lista.map(p => `<button class="prod ${p.stock <= 0 ? 'agotado' : ''}" data-p="${p.id}">
             <span class="prod-img" style="--h:${T.tono(p.categoria || p.nombre)}">${p.foto ? `<img src="${p.foto}" alt="" loading="lazy">` : T.esc(T.iniciales(p.nombre))}</span>
             <span class="prod-nom">${T.esc(p.nombre)}</span>
-            <span class="prod-pie"><span class="precio">${T.money(p.precio)}</span><small class="${p.stock > 0 && p.stockMin > 0 && p.stock <= p.stockMin ? 'poco' : ''}">${p.stock <= 0 ? 'Agotado' : T.cant(p.stock) + (p.unidad && p.unidad !== 'und' ? ' ' + p.unidad : ' und')}</small></span></button>`).join('')
+            <span class="prod-pie"><span class="precio">${T.money(p.precio)}</span><small class="${p.stock > 0 && p.stockMin > 0 && p.stock <= p.stockMin ? 'poco' : ''}">${p.stock <= 0 ? 'Agotado' : T.cant(p.stock) + (p.unidad && p.unidad !== 'und' ? ' ' + p.unidad : ' und')}${(p.presentaciones || []).length ? ' · +' + p.presentaciones.length : ''}</small></span></button>`).join('')
           : `<p class="vacio" style="grid-column:1/-1">${T.db.lista('productos').length ? 'Ningún producto coincide.' : 'Aún no hay productos. Vaya a Inventario para agregarlos.'}</p>`;
         return lista;
       };
@@ -154,31 +158,44 @@
         T.$('#cobrar', el).disabled = !carrito.length;
         guardar();
       };
-      const agregar = async p => {
-        if (p.stock - cantEnCarrito(p.id) <= 0 && !T.regla('venderSinStock')) return T.toast(`No hay existencias de "${p.nombre}"`, 'error');
+      // Productos con presentaciones (unidad, six-pack, paca): se pregunta cuál se vende.
+      // Devuelve la presentación, null para la unidad suelta, o undefined si se cancela.
+      const elegirPres = p => new Promise(res => {
+        const m = T.modal({
+          titulo: p.nombre, ancho: 420, alCerrar: v => res(v === undefined || v === null ? undefined : v === 'und' ? null : v),
+          cuerpo: `<div class="metodos lista-pres"><button data-pr="und"><span>${T.esc(T.UNIDADES[p.unidad] || 'Unidad')}</span><b class="num">${T.money(p.precio)}</b></button>
+            ${p.presentaciones.map(x => `<button data-pr="${x.id}"><span>${T.esc(x.nombre)} <small class="suave">(${T.cant(x.factor)} und)</small></span><b class="num">${T.money(x.precio)}</b></button>`).join('')}</div>`
+        });
+        m.cuerpo.onclick = e => { const b = e.target.closest('[data-pr]'); if (b) m.cerrar(b.dataset.pr === 'und' ? 'und' : p.presentaciones.find(x => x.id === b.dataset.pr)); };
+      });
+      // pres: presentación a vender; null = unidad suelta; sin indicar = se pregunta si el producto tiene varias.
+      const agregar = async (p, pres) => {
+        if (pres === undefined && (p.presentaciones || []).length) { pres = await elegirPres(p); if (pres === undefined) return q.focus(); }
+        const factor = pres ? pres.factor : 1, libres = p.stock - cantEnCarrito(p.id);
+        if ((pres ? libres < factor : libres <= 0) && !T.regla('venderSinStock')) return T.toast(pres ? `No hay ${T.cant(factor)} unidades de "${p.nombre}" para ${pres.nombre} (quedan ${T.cant(Math.max(0, libres))})` : `No hay existencias de "${p.nombre}"`, 'error');
         let cant = 1;
-        if (['kg', 'lb', 'g', 'l', 'ml'].includes(p.unidad)) {
+        if (!pres && ['kg', 'lb', 'g', 'l', 'ml'].includes(p.unidad)) {
           const r = await T.pedir({ titulo: p.nombre, ok: 'Agregar', ancho: 360, campos: [{ id: 'c', label: `Cantidad en ${T.UNIDADES[p.unidad].toLowerCase()}s — ${T.money(p.precio)} por ${p.unidad}`, tipo: 'number', req: true }] });
           if (!r || !(r.c > 0)) return q.focus();
           cant = r.c;
         }
-        const l = carrito.find(x => x.productoId === p.id && !x.descuento);
+        const presId = pres ? pres.id : '', l = carrito.find(x => x.productoId === p.id && (x.presId || '') === presId && !x.descuento);
         if (l) l.cantidad = T.r3(l.cantidad + cant);
-        else carrito.push({ productoId: p.id, nombre: p.nombre, unidad: p.unidad || 'und', precio: p.precio, cantidad: cant, descuento: 0 });
+        else carrito.push({ productoId: p.id, presId, factor, nombre: pres ? `${p.nombre} · ${pres.nombre}` : p.nombre, unidad: pres ? 'und' : p.unidad || 'und', precio: pres ? pres.precio : p.precio, cantidad: cant, descuento: 0 });
         pintar(); q.value = ''; pintarProds(); q.focus();
       };
 
       q.oninput = pintarProds;
       q.onkeydown = e => {
         if (e.key !== 'Enter') return;
-        const exacto = T.neg.buscarCodigo(q.value.trim()), lista = pintarProds();
-        if (exacto) agregar(exacto); else if (lista.length === 1) agregar(lista[0]); else if (q.value.trim()) T.toast('No se encontró ese código', 'error');
+        const exacto = T.neg.porCodigo(q.value.trim()), lista = pintarProds();
+        if (exacto) agregar(exacto.p, exacto.pres); else if (lista.length === 1) agregar(lista[0]); else if (q.value.trim()) T.toast('No se encontró ese código', 'error');
       };
       T.$('#scan', el).onclick = async () => {
         const cod = await T.ui.escanear();
         if (!cod) return;
-        const p = T.neg.buscarCodigo(cod);
-        if (p) agregar(p); else { q.value = cod; pintarProds(); T.toast('Ese código no está en el inventario', 'error'); }
+        const r = T.neg.porCodigo(cod);
+        if (r) agregar(r.p, r.pres); else { q.value = cod; pintarProds(); T.toast('Ese código no está en el inventario', 'error'); }
       };
       T.$('#cats', el).onclick = e => { const b = e.target.closest('[data-c]'); if (b) { categoria = b.dataset.c; pintarCats(); pintarProds(); } };
       T.$('#prods', el).onclick = e => { const b = e.target.closest('[data-p]'); if (b) agregar(T.db.get('productos', b.dataset.p)); };
@@ -196,7 +213,7 @@
           const r = await T.pedir({ titulo: 'Precio de ' + l.nombre, ancho: 360, ok: 'Cambiar', campos: [{ id: 'p', label: 'Precio por ' + (T.UNIDADES[l.unidad] || 'unidad').toLowerCase(), tipo: 'number', valor: l.precio, req: true }] });
           if (!r) return;
           const p = T.db.get('productos', l.productoId);
-          if (T.regla('bloquearBajoCosto') && r.p < (p.costo || 0)) return T.toast('Ese precio queda por debajo del costo', 'error');
+          if (T.regla('bloquearBajoCosto') && r.p < (p.costo || 0) * (l.factor || 1)) return T.toast('Ese precio queda por debajo del costo', 'error');
           l.precio = T.red(r.p); l.descuento = 0; autorizaDesc = quien;
         }
         pintar();

@@ -3,6 +3,52 @@
 (function (T) {
   T.ui = T.ui || {};
 
+  // Devolución de algunos productos de una venta.
+  T.ui.devolver = async v => {
+    const filas = v.items.map((l, i) => ({ l, i, queda: T.r3(l.cantidad - (l.devuelto || 0)) })).filter(x => x.queda > 0);
+    if (!filas.length) { T.toast('De esta venta ya se devolvió todo'); return false; }
+    const quien = await T.auth.autorizar('ventas.anular', 'Devolución · recibo ' + v.numero);
+    if (!quien) return false;
+    return new Promise(res => {
+      const leer = cu => filas.map((x, n) => ({ i: x.i, cantidad: Math.min(x.queda, Math.max(0, T.aNum(T.$$('[data-dev]', cu)[n].value))) })).filter(x => x.cantidad > 0);
+      const m = T.modal({
+        titulo: `Devolución · recibo ${v.numero}`, ancho: 580, alCerrar: r => res(!!r),
+        cuerpo: `<p class="suave" style="margin-bottom:10px">Escriba cuántas unidades devuelve el cliente de cada producto. Vuelven al inventario.</p>
+          ${T.tabla([{ t: 'Producto', v: x => T.esc(x.l.nombre) }, { t: 'Compró', cls: 'der num', v: x => T.cant(x.queda) }, { t: 'Precio', cls: 'der num', v: x => T.money(x.l.total / x.l.cantidad) },
+          { t: 'Devuelve', cls: 'der', v: x => `<input data-dev type="number" step="any" min="0" max="${x.queda}" value="" placeholder="0" style="width:80px;text-align:right" aria-label="Cantidad que devuelve de ${T.esc(x.l.nombre)}">` }], filas)}
+          <label class="campo" style="margin-top:12px"><span>Motivo *</span><input id="motivo" placeholder="Ej: producto dañado, se equivocó de producto"></label>
+          <div class="cambio" id="res">Valor a devolver: ${T.money(0)}</div>`,
+        botones: [{ txt: 'Cancelar', cls: 'sec' }, {
+          txt: 'Registrar devolución', cls: 'pri', fn: async cu => {
+            const r = await T.neg.devolver(v.id, { items: leer(cu), motivo: T.$('#motivo', cu).value.trim(), autoriza: quien });
+            T.toast(r.devolucion.enEfectivo ? `Devuelva ${T.money(r.devolucion.enEfectivo)} en efectivo` : 'Devolución registrada', 'ok');
+            return r;
+          }
+        }]
+      });
+      m.cuerpo.oninput = () => {
+        const total = Math.min(v.total - (v.devuelto || 0), leer(m.cuerpo).reduce((a, x) => { const l = v.items[x.i]; return a + T.red(l.total / l.cantidad * x.cantidad); }, 0));
+        const aFiado = v.clienteId ? Math.min(total, (v.fiado || 0) - (v.fiadoDevuelto || 0)) : 0;
+        T.$('#res', m.cuerpo).textContent = aFiado ? `Se descuenta de la deuda: ${T.money(aFiado)}${total - aFiado ? ` · En efectivo: ${T.money(total - aFiado)}` : ''}` : `Devolver en efectivo: ${T.money(total)}`;
+      };
+    });
+  };
+
+  // Lista de ventas con sus acciones; la usan Reportes y Caja.
+  T.ui.tablaVentas = (ventas, vacio = 'No hay ventas.') => T.tabla([
+    { t: 'Recibo', v: v => `<b>${T.esc(v.numero)}</b><br><small class="suave">${T.fechaHora(v.fecha)}</small>` }, { t: 'Vendedor', v: v => T.esc(v.usuario) }, { t: 'Cliente', v: v => T.esc(v.cliente || '—') },
+    { t: 'Pago', v: v => v.pagos.map(p => T.METODOS[p.metodo]).join(' + ') },
+    { t: 'Total', cls: 'der num', v: v => `${T.money(v.total - (v.devuelto || 0))}${v.devuelto ? `<br><small class="suave">devuelto ${T.money(v.devuelto)}</small>` : ''}` },
+    { t: 'Estado', v: v => v.estado === 'anulada' ? `<span class="etq mal" title="${T.esc(v.anulacion.motivo)}">Anulada</span>` : v.devuelto ? '<span class="etq aviso">Con devolución</span>' : '<span class="etq ok">OK</span>' },
+    { t: '', cls: 'acc', v: v => `<button class="btn-ico" data-a="ver" data-v="${v.id}" title="Ver recibo">${T.ico('lista')}</button>${v.estado === 'completada' ? `<button class="btn mini" data-a="devolver" data-v="${v.id}">Devolución</button>${v.devuelto ? '' : `<button class="btn mini" data-a="anular" data-v="${v.id}">Anular</button>`}` : ''}` }
+  ], ventas, vacio);
+  T.ui.accionVenta = async (e, ventas, alCambiar) => {
+    const b = e.target.closest('[data-a]'); if (!b) return;
+    const v = ventas.find(x => x.id === b.dataset.v); if (!v) return;
+    if (b.dataset.a === 'ver') return T.ui.verRecibo(v);
+    if (await (b.dataset.a === 'devolver' ? T.ui.devolver(v) : T.ui.anular(v))) alCambiar();
+  };
+
   T.ui.anular = async v => {
     const quien = await T.auth.autorizar('ventas.anular', 'Recibo ' + v.numero);
     if (!quien) return false;
@@ -35,21 +81,12 @@
             ${util ? `<div class="tarjeta kpi"><h4>Utilidad bruta</h4><b>${T.money(r.utilidad)}</b><small>${r.total ? Math.round(r.utilidad / r.total * 100) : 0}% de margen</small></div>
             <div class="tarjeta kpi"><h4>Gastos de caja</h4><b>${T.money(r.gastos)}</b><small>Queda ${T.money(r.utilidad - r.gastos)} después de gastos</small></div>` : ''}
             <div class="tarjeta kpi"><h4>Fiado / abonos</h4><b>${T.money(r.fiado)}</b><small>Abonos recibidos ${T.money(r.abonos)}</small></div>
-            <div class="tarjeta kpi"><h4>Descuentos / anuladas</h4><b>${T.money(r.descuento)}</b><small>${r.anuladas} venta(s) anulada(s)${r.impuesto ? ` · IVA ${T.money(r.impuesto)}` : ''}</small></div></div>
+            <div class="tarjeta kpi"><h4>Devoluciones</h4><b>${T.money(r.devuelto)}</b><small>${r.anuladas} venta(s) anulada(s) · descuentos ${T.money(r.descuento)}${r.impuesto ? ` · IVA ${T.money(r.impuesto)}` : ''}</small></div></div>
           ${dias.length > 1 ? `<div class="tarjeta" style="margin-bottom:14px"><h4>Ventas por día</h4><div class="barras">${dias.slice(-31).map(d => `<div title="${T.fechaCorta(d)}: ${T.money(r.porDia[d])}"><i style="height:${Math.round(r.porDia[d] / max * 100)}%"></i>${dias.length <= 14 ? `<span>${d.slice(8)}/${d.slice(5, 7)}</span>` : ''}</div>`).join('')}</div></div>` : ''}
           <div class="rejilla dos"><div class="tarjeta"><h4>Por medio de pago</h4>${barras(r.porMetodo)}</div><div class="tarjeta"><h4>Por categoría</h4>${barras(r.porCategoria)}</div><div class="tarjeta"><h4>Por vendedor</h4>${barras(r.porUsuario)}</div></div>`;
       } else if (this.pestana === 'ventas') {
-        cont.innerHTML = T.tabla([
-          { t: 'Recibo', v: v => `<b>${T.esc(v.numero)}</b><br><small class="suave">${T.fechaHora(v.fecha)}</small>` }, { t: 'Vendedor', v: v => T.esc(v.usuario) }, { t: 'Cliente', v: v => T.esc(v.cliente || '—') },
-          { t: 'Pago', v: v => v.pagos.map(p => T.METODOS[p.metodo]).join(' + ') }, { t: 'Total', cls: 'der num', v: v => T.money(v.total) },
-          { t: 'Estado', v: v => v.estado === 'anulada' ? `<span class="etq mal" title="${T.esc(v.anulacion.motivo)}">Anulada</span>` : '<span class="etq ok">OK</span>' },
-          { t: '', cls: 'acc', v: v => `<button class="btn-ico" data-a="ver" data-v="${v.id}" title="Ver recibo">${T.ico('lista')}</button>${v.estado === 'completada' ? `<button class="btn mini" data-a="anular" data-v="${v.id}">Anular</button>` : ''}` }
-        ], r.ventas.slice(0, 400), 'No hay ventas en este rango.');
-        cont.onclick = async e => {
-          const b = e.target.closest('[data-a]'); if (!b) return;
-          const v = r.ventas.find(x => x.id === b.dataset.v);
-          if (b.dataset.a === 'ver') T.ui.verRecibo(v); else if (await T.ui.anular(v)) this.render(el);
-        };
+        cont.innerHTML = T.ui.tablaVentas(r.ventas.slice(0, 400), 'No hay ventas en este rango.');
+        cont.onclick = e => T.ui.accionVenta(e, r.ventas, () => this.render(el));
       } else {
         cont.innerHTML = T.tabla([
           { t: 'Producto', v: p => T.esc(p.nombre) }, { t: 'Vendidos', cls: 'der num', v: p => T.cant(p.cantidad) }, { t: 'Ventas', cls: 'der num', v: p => T.money(p.total) },
@@ -97,7 +134,7 @@
   };
 
   // ════════════ BITÁCORA ════════════
-  const ACCIONES = { 'venta.crear': 'Venta', 'venta.anular': 'Venta anulada', 'producto.crear': 'Producto creado', 'producto.editar': 'Producto editado', 'producto.borrar': 'Producto eliminado', 'inventario.ajuste': 'Ajuste de existencias', 'inventario.merma': 'Merma', 'inventario.entrada': 'Entrada de mercancía', 'compra.crear': 'Compra', 'compra.pagar': 'Pago a proveedor', 'proveedor.crear': 'Proveedor creado', 'proveedor.editar': 'Proveedor editado', 'cliente.crear': 'Cliente creado', 'cliente.editar': 'Cliente editado', 'abono.crear': 'Abono', 'caja.abrir': 'Caja abierta', 'caja.cerrar': 'Caja cerrada', 'caja.gasto': 'Gasto', 'caja.ingreso': 'Ingreso', 'caja.retiro': 'Retiro', 'sesion.iniciar': 'Entró', 'sesion.cerrar': 'Salió', 'sesion.fallida': 'Clave incorrecta', autorizacion: 'Autorización', 'usuario.crear': 'Usuario creado', 'usuario.editar': 'Usuario editado', 'config.cambiar': 'Configuración', 'respaldo.descargar': 'Respaldo descargado', 'respaldo.restaurar': 'Respaldo restaurado', 'ia.foto': 'Foto con IA', 'tienda.crear': 'Tienda creada', 'nube.configurar': 'Nube configurada', 'nube.entrar': 'Nube conectada', 'nube.salir': 'Nube desconectada' };
+  const ACCIONES = { 'venta.crear': 'Venta', 'venta.anular': 'Venta anulada', 'venta.devolver': 'Devolución', 'producto.crear': 'Producto creado', 'producto.editar': 'Producto editado', 'producto.borrar': 'Producto eliminado', 'inventario.ajuste': 'Ajuste de existencias', 'inventario.merma': 'Merma', 'inventario.entrada': 'Entrada de mercancía', 'compra.crear': 'Compra', 'compra.pagar': 'Pago a proveedor', 'proveedor.crear': 'Proveedor creado', 'proveedor.editar': 'Proveedor editado', 'cliente.crear': 'Cliente creado', 'cliente.editar': 'Cliente editado', 'abono.crear': 'Abono', 'caja.abrir': 'Caja abierta', 'caja.cerrar': 'Caja cerrada', 'caja.gasto': 'Gasto', 'caja.ingreso': 'Ingreso', 'caja.retiro': 'Retiro', 'sesion.iniciar': 'Entró', 'sesion.cerrar': 'Salió', 'sesion.fallida': 'Clave incorrecta', autorizacion: 'Autorización', 'usuario.crear': 'Usuario creado', 'usuario.editar': 'Usuario editado', 'config.cambiar': 'Configuración', 'respaldo.descargar': 'Respaldo descargado', 'respaldo.restaurar': 'Respaldo restaurado', 'ia.foto': 'Foto con IA', 'tienda.crear': 'Tienda creada', 'nube.configurar': 'Nube configurada', 'nube.entrar': 'Nube conectada', 'nube.salir': 'Nube desconectada' };
   // Las ediciones guardan {campo: [antes, después]}; se muestran como "antes → después".
   const esCambio = (k, v) => Array.isArray(v) && v.length === 2 && k !== 'productos' && k !== 'pagos' && v.every(x => x === null || typeof x !== 'object');
   const detalle = d => d == null ? '' : typeof d !== 'object' ? String(d) : Object.entries(d).map(([k, v]) => `${k}: ${esCambio(k, v) ? `${v[0] ?? '—'} → ${v[1] ?? '—'}` : v !== null && typeof v === 'object' ? JSON.stringify(v) : v}`).join(' · ');

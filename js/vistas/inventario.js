@@ -4,7 +4,7 @@
   T.ui = T.ui || {};
   let filtro = 'todos', cat = '', texto = '';
 
-  const TIPOS_MOV = { inicial: 'Existencia inicial', compra: 'Compra', entrada: 'Entrada', venta: 'Venta', anulacion: 'Anulación de venta', ajuste: 'Ajuste por conteo', merma: 'Merma / daño' };
+  const TIPOS_MOV = { inicial: 'Existencia inicial', compra: 'Compra', entrada: 'Entrada', venta: 'Venta', anulacion: 'Anulación de venta', devolucion: 'Devolución de cliente', ajuste: 'Ajuste por conteo', merma: 'Merma / daño' };
   const opcCats = () => T.categorias().map(c => [c, c]);
 
   // Productos del inventario parecidos a un nombre (para no crear duplicados).
@@ -26,6 +26,7 @@
   T.ui.editarProducto = (p, previo = {}) => new Promise(res => {
     const d = { unidad: 'und', iva: 0, activo: true, ...previo, ...(p || {}) };
     let foto = d.foto || '';
+    const pres = (d.presentaciones || []).map(x => ({ ...x }));
     const verCosto = T.auth.puede('utilidad.ver');
     const campos = [
       { id: 'nombre', label: 'Nombre', req: true, valor: d.nombre, ph: 'Ej: Arroz Diana 500 g' },
@@ -46,17 +47,33 @@
           <button class="btn mini" id="cambiar-foto">${T.ico('camara')} Foto</button>
           ${T.auth.puede('ia.usar') ? `<button class="btn mini ia" id="ia-foto">${T.ico('ia')} Llenar con foto (IA)</button>` : ''}</div>
         ${T.form(campos)}<datalist id="dl-cat">${T.categorias().map(c => `<option value="${T.esc(c)}">`).join('')}</datalist>
-        ${p ? `<p class="suave" style="margin-top:10px">Existencias: <b>${T.cant(p.stock)}</b>. Para cambiarlas use “Ajustar” o registre una compra: así queda el rastro.</p>` : ''}`,
+        ${p ? `<p class="suave" style="margin-top:10px">Existencias: <b>${T.cant(p.stock)}</b>. Para cambiarlas use “Ajustar” o registre una compra: así queda el rastro.</p>` : ''}
+        <h4 style="margin:18px 0 4px">Presentaciones (opcional)</h4>
+        <p class="suave" style="font-size:.84rem;margin-bottom:8px">Para vender o comprar este producto también por paca, caja o six-pack. El inventario siempre se lleva en unidades sueltas.</p>
+        <div id="pres"></div><button class="btn mini" id="mas-pres" style="margin-top:8px">${T.ico('mas')} Presentación</button>`,
       botones: [...(p && T.auth.puede('inventario.editar') ? [{ txt: 'Eliminar', cls: 'sec', fn: async () => { if (!await T.confirmar(`¿Eliminar "${p.nombre}"? Queda guardado en el historial pero ya no aparece.`, { peligro: true, ok: 'Eliminar' })) return false; await T.neg.borrarProducto(p.id); return { borrado: true }; } }] : []),
       { txt: 'Cancelar', cls: 'sec' }, {
         txt: 'Guardar', cls: 'pri', fn: async cu => {
           const v = T.leerForm(cu, campos), stock = v.stock || 0;
           delete v.stock; v.iva = Number(v.iva);
+          v.presentaciones = pres.filter(x => x.nombre || x.factor || x.precio).map(x => ({ id: x.id || T.uid().slice(0, 8), nombre: (x.nombre || '').trim(), factor: T.aNum(x.factor), precio: T.red(T.aNum(x.precio)), codigo: (x.codigo || '').trim() }));
           return T.neg.guardarProducto({ ...(p ? { id: p.id } : {}), ...v, foto }, stock);
         }
       }]
     });
     const cu = m.cuerpo, ponerFoto = f => { foto = f; T.$('#foto', cu).src = f; };
+    const pintarPres = () => {
+      T.$('#pres', cu).innerHTML = pres.length ? `<div class="tabla-caja"><table class="tabla"><thead><tr><th>Nombre</th><th>Unidades que trae</th><th>Precio de venta</th><th>Código de barras</th><th></th></tr></thead><tbody>
+        ${pres.map((x, i) => `<tr data-i="${i}"><td><input data-k="nombre" value="${T.esc(x.nombre || '')}" placeholder="Paca x 24" aria-label="Nombre de la presentación"></td>
+          <td><input data-k="factor" type="number" value="${x.factor || ''}" style="width:90px" aria-label="Unidades que trae"></td>
+          <td><input data-k="precio" type="number" value="${x.precio || ''}" style="width:110px" aria-label="Precio de la presentación"></td>
+          <td><input data-k="codigo" value="${T.esc(x.codigo || '')}" style="width:130px" aria-label="Código de la presentación"></td>
+          <td><button class="btn-ico" data-quitar aria-label="Quitar presentación">${T.ico('borrar')}</button></td></tr>`).join('')}</tbody></table></div>` : '';
+    };
+    T.$('#pres', cu).oninput = e => { const tr = e.target.closest('tr'); if (tr && e.target.dataset.k) pres[+tr.dataset.i][e.target.dataset.k] = e.target.value; };
+    T.$('#pres', cu).onclick = e => { const b = e.target.closest('[data-quitar]'); if (b) { pres.splice(+b.closest('tr').dataset.i, 1); pintarPres(); } };
+    T.$('#mas-pres', cu).onclick = () => { pres.push({ nombre: '', factor: '', precio: '', codigo: '' }); pintarPres(); const u = T.$$('#pres [data-k=nombre]', cu).pop(); if (u) u.focus(); };
+    pintarPres();
     T.$('#cambiar-foto', cu).onclick = async () => { const [f] = await T.elegirArchivo('image/*'); if (f) ponerFoto(await T.img.miniatura(await T.img.leer(f, 640))); };
     const ia = T.$('#ia-foto', cu);
     if (ia) ia.onclick = async () => {
@@ -176,17 +193,20 @@
       botones: [{ txt: 'Cancelar', cls: 'sec' }, { txt: 'Guardar en el inventario', cls: 'pri', fn: () => guardar() }]
     });
     const cu = m.cuerpo;
+    // Presentaciones del producto enlazado: permiten digitar la compra en pacas o cajas.
+    const presDe = f => (f.productoId && T.db.get('productos', f.productoId).presentaciones) || [];
+    const factorDe = f => (presDe(f).find(x => x.id === f.presCompra) || { factor: 1 }).factor;
     const pintar = () => {
       const compra = T.$('#esCompra', cu).checked;
       T.$('#cab', cu).classList.toggle('oculto', !compra);
-      T.$('#filas', cu).innerHTML = filas.length ? `<div class="tabla-caja"><table class="tabla"><thead><tr><th style="min-width:230px">Producto</th><th>Código</th><th>Categoría</th><th>Cantidad</th><th>Costo unidad</th><th>Precio venta</th><th></th></tr></thead><tbody>
+      T.$('#filas', cu).innerHTML = filas.length ? `<div class="tabla-caja"><table class="tabla"><thead><tr><th style="min-width:230px">Producto</th><th>Código</th><th>Categoría</th><th>Cantidad</th><th>Costo</th><th>Precio venta</th><th></th></tr></thead><tbody>
         ${filas.map((f, i) => `<tr data-i="${i}">
           <td><div class="fila" style="flex-wrap:nowrap">${f.foto ? `<img class="mini-foto" src="${f.foto}" alt="">` : ''}<div class="crece">
             <input data-k="nombre" value="${T.esc(f.productoId ? T.db.get('productos', f.productoId).nombre : f.nombre)}" ${f.productoId ? 'disabled' : ''} aria-label="Nombre">
             <select data-k="productoId" aria-label="Producto existente" style="margin-top:4px"><option value="">➕ Crear como producto nuevo</option>${f.candidatos.map(p => `<option value="${p.id}" ${p.id === f.productoId ? 'selected' : ''}>Ya existe: ${T.esc(p.nombre)} (hay ${T.cant(p.stock)})</option>`).join('')}</select></div></div></td>
           <td><input data-k="codigo" value="${T.esc(f.productoId ? T.db.get('productos', f.productoId).codigo || '' : f.codigo || '')}" ${f.productoId ? 'disabled' : ''} style="width:130px" aria-label="Código"></td>
           <td><select data-k="categoria" ${f.productoId ? 'disabled' : ''} aria-label="Categoría">${['', ...T.categorias()].map(c => `<option ${c === (f.productoId ? T.db.get('productos', f.productoId).categoria : f.categoria) ? 'selected' : ''}>${T.esc(c)}</option>`).join('')}</select></td>
-          <td><input data-k="cantidad" type="number" step="any" value="${f.cantidad ?? ''}" style="width:84px" aria-label="Cantidad"></td>
+          <td><input data-k="cantidad" type="number" step="any" value="${f.cantidad ?? ''}" style="width:84px" aria-label="Cantidad">${presDe(f).length ? `<select data-k="presCompra" style="margin-top:4px;width:auto" aria-label="Se compra por"><option value="">unidades</option>${presDe(f).map(x => `<option value="${x.id}" ${x.id === f.presCompra ? 'selected' : ''}>${T.esc(x.nombre)}</option>`).join('')}</select>` : ''}</td>
           <td><input data-k="costo" type="number" value="${f.costo || ''}" style="width:104px" aria-label="Costo"></td>
           <td><input data-k="precio" type="number" value="${f.precio || ''}" style="width:104px" aria-label="Precio"></td>
           <td><button class="btn-ico" data-quitar aria-label="Quitar">${T.ico('borrar')}</button></td></tr>`).join('')}</tbody></table></div>` : '<p class="vacio">Agregue productos con el buscador de abajo.</p>';
@@ -200,7 +220,11 @@
     T.$('#filas', cu).onchange = e => {
       const tr = e.target.closest('tr'), k = e.target.dataset.k; if (!tr || !k) return;
       const f = filas[+tr.dataset.i];
-      if (k === 'productoId') { f.productoId = ''; if (e.target.value) enlazar(f, T.db.get('productos', e.target.value)); return pintar(); }
+      if (k === 'productoId') { f.productoId = ''; f.presCompra = ''; if (e.target.value) enlazar(f, T.db.get('productos', e.target.value)); return pintar(); }
+      if (k === 'presCompra') {   // el costo pasa de "por unidad" a "por paca" (o al revés)
+        const antes = factorDe(f); f.presCompra = e.target.value;
+        f.costo = T.red((f.costo || 0) / antes * factorDe(f)); return pintar();
+      }
       if (['cantidad', 'costo', 'precio'].includes(k)) {
         f[k] = T.aNum(e.target.value);
         if (k === 'costo' && !f.precio && f.costo) { f.precio = T.neg.precioSugerido(f.costo); T.$('[data-k=precio]', tr).value = f.precio; }
@@ -227,7 +251,7 @@
       if (!filas.length) throw new Error('No hay productos para guardar');
       const items = filas.map(f => {
         if (!f.productoId && !f.nombre) throw new Error('Hay un producto sin nombre');
-        return { productoId: f.productoId || null, nuevo: f.productoId ? null : { nombre: f.nombre, codigo: f.codigo || '', categoria: f.categoria || '', marca: f.marca || '', unidad: f.unidad || 'und', foto: f.foto || '' }, cantidad: f.cantidad, costo: f.costo || 0, precio: f.precio || 0 };
+        return { productoId: f.productoId || null, nuevo: f.productoId ? null : { nombre: f.nombre, codigo: f.codigo || '', categoria: f.categoria || '', marca: f.marca || '', unidad: f.unidad || 'und', foto: f.foto || '' }, cantidad: T.r3((f.cantidad || 0) * factorDe(f)), costo: T.red((f.costo || 0) / factorDe(f)), precio: f.precio || 0 };
       });
       let proveedorId = null;
       if (compra && nomProv) {
@@ -290,7 +314,7 @@
         T.$('#resumen', el).textContent = `${lista.length} producto(s)` + (verCosto ? ` · Vale a costo ${T.money(lista.reduce((a, p) => a + Math.max(0, p.stock) * (p.costo || 0), 0))} · a precio de venta ${T.money(lista.reduce((a, p) => a + Math.max(0, p.stock) * (p.precio || 0), 0))}` : '');
         T.$('#tabla', el).innerHTML = T.tabla([
           { t: '', v: p => p.foto ? `<img class="mini-foto" src="${p.foto}" alt="" loading="lazy">` : `<span class="mini-foto ini" style="--h:${T.tono(p.categoria || p.nombre)}">${T.esc(T.iniciales(p.nombre))}</span>` },
-          { t: 'Producto', v: p => `<b>${T.esc(p.nombre)}</b><br><small class="suave">${T.esc([p.categoria, p.marca, p.codigo].filter(Boolean).join(' · '))}</small>` },
+          { t: 'Producto', v: p => `<b>${T.esc(p.nombre)}</b><br><small class="suave">${T.esc([p.categoria, p.marca, p.codigo].filter(Boolean).join(' · '))}</small>${(p.presentaciones || []).length ? `<br><small class="suave">${p.presentaciones.map(x => `${T.esc(x.nombre)}: ${T.money(x.precio)}`).join(' · ')}</small>` : ''}` },
           ...(verCosto ? [{ t: 'Costo', cls: 'der num', v: p => T.money(p.costo) }] : []),
           { t: 'Precio', cls: 'der num', v: p => `<b>${T.money(p.precio)}</b>${verCosto && p.costo && p.precio ? `<br><small class="suave">${Math.round((p.precio - p.costo) / p.precio * 100)}% margen</small>` : ''}` },
           { t: 'Hay', cls: 'der num', v: p => `<span class="etq ${p.stock <= 0 ? 'mal' : p.stockMin > 0 && p.stock <= p.stockMin ? 'aviso' : 'ok'}">${T.cant(p.stock)} ${p.unidad !== 'und' ? p.unidad : ''}</span>` },

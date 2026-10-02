@@ -1,7 +1,10 @@
 {
-  "version": "1.1.1",
+  "version": "1.2.0",
   "fecha": "2026-10-02",
   "notas": [
+    "Devoluciones parciales: el cliente puede devolver algunos productos de una venta.",
+    "Presentaciones: vender y comprar por paca, caja o six-pack.",
+    "Pedido sugerido a proveedores con envío por WhatsApp.",
     "Buscador de clientes en el panel de ventas.",
     "Nuevo diseño: menú lateral, barra de caja, panel de ventas, tablero y pantalla de entrada.",
     "La nube viene conectada: solo correo y clave."

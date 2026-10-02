@@ -16,17 +16,59 @@
   };
 
   T.vistas.compras = {
-    pestana: 'compras',
+    pestana: 'compras', dias: 15,
+
+    // ── Pedido sugerido a proveedores ──
+    async pedido(cont) {
+      const filas = await T.neg.sugerirPedido(this.dias), grupos = new Map(), neg = T.db.cfg('negocio', {});
+      filas.forEach(f => { f.pedir = f.pres ? f.paquetes : f.sugerido; const k = f.p.proveedorId || ''; if (!grupos.has(k)) grupos.set(k, []); grupos.get(k).push(f); });
+      const orden = [...grupos.keys()].sort((a, b) => !a ? 1 : !b ? -1 : (T.db.get('proveedores', a) || { nombre: '' }).nombre.localeCompare((T.db.get('proveedores', b) || { nombre: '' }).nombre, 'es'));
+      const unidades = f => T.r3(f.pedir * (f.pres ? f.pres.factor : 1));
+      const costoDe = f => T.red(unidades(f) * (f.p.costo || 0));
+      const texto = k => `Pedido ${neg.nombre || ''} — ${T.fecha(Date.now())}\n${grupos.get(k).filter(f => f.pedir > 0).map(f => `• ${T.cant(f.pedir)} ${f.pres ? f.pres.nombre : (T.UNIDADES[f.p.unidad] || 'und').toLowerCase()} — ${f.p.nombre}`).join('\n')}`;
+      const totalDe = k => grupos.get(k).reduce((a, f) => a + costoDe(f), 0);
+      cont.innerHTML = `<div class="fila" style="margin-bottom:14px"><span class="suave">Que alcance para</span>
+          <select id="dias" style="width:auto">${[7, 15, 30].map(d => `<option value="${d}" ${d === this.dias ? 'selected' : ''}>${d} días</option>`).join('')}</select>
+          <span class="suave">según lo vendido en las últimas 4 semanas y el mínimo de cada producto.</span></div>
+        ${filas.length ? orden.map(k => {
+          const prov = T.db.get('proveedores', k);
+          return `<div class="tarjeta" style="margin-bottom:14px;padding:0;overflow:hidden" data-g="${k}">
+            <div class="fila" style="padding:14px 16px;justify-content:space-between"><div><h3>${T.esc(prov ? prov.nombre : 'Sin proveedor asignado')}</h3><span class="suave" data-tot>${grupos.get(k).length} producto(s) · aprox. ${T.money(totalDe(k))}</span></div>
+              <div class="fila">${prov && prov.telefono ? `<button class="btn" data-acc="wa">WhatsApp</button>` : ''}<button class="btn" data-acc="copiar">Copiar</button><button class="btn" data-acc="imprimir">${T.ico('imprimir')} Imprimir</button><button class="btn pri" data-acc="llego">Llegó el pedido</button></div></div>
+            <table class="tabla"><thead><tr><th>Producto</th><th class="der">Hay</th><th class="der">Vendido 4 sem.</th><th class="der">Alcanza</th><th class="der">Pedir</th><th class="der">Costo aprox.</th></tr></thead><tbody>
+            ${grupos.get(k).map((f, i) => `<tr data-i="${i}"><td><b>${T.esc(f.p.nombre)}</b></td><td class="der num">${T.cant(f.stock)}</td><td class="der num">${T.cant(f.vendidos)}</td>
+              <td class="der">${f.diasQuedan === null ? '<span class="etq">sin ventas</span>' : `<span class="etq ${f.diasQuedan <= 3 ? 'mal' : f.diasQuedan <= 7 ? 'aviso' : ''}">${f.diasQuedan} día(s)</span>`}</td>
+              <td class="der"><input type="number" min="0" step="any" value="${f.pedir}" style="width:76px;text-align:right" aria-label="Cantidad a pedir de ${T.esc(f.p.nombre)}"> <small class="suave">${T.esc(f.pres ? f.pres.nombre : (T.UNIDADES[f.p.unidad] || 'und').toLowerCase())}</small></td>
+              <td class="der num" data-c>${T.money(costoDe(f))}</td></tr>`).join('')}</tbody></table></div>`;
+        }).join('') : '<p class="vacio">No hace falta pedir nada por ahora: lo que hay alcanza para los días elegidos.<br>Para que esta lista sirva, ponga a cada producto su mínimo y su proveedor.</p>'}`;
+      T.$('#dias', cont).onchange = e => { this.dias = +e.target.value; this.pedido(cont); };
+      cont.oninput = e => {
+        const tr = e.target.closest('tr[data-i]'), g = e.target.closest('[data-g]'); if (!tr || !g) return;
+        const f = grupos.get(g.dataset.g)[+tr.dataset.i];
+        f.pedir = Math.max(0, T.aNum(e.target.value));
+        T.$('[data-c]', tr).textContent = T.money(costoDe(f));
+        T.$('[data-tot]', g).textContent = `${grupos.get(g.dataset.g).length} producto(s) · aprox. ${T.money(totalDe(g.dataset.g))}`;
+      };
+      cont.onclick = async e => {
+        const b = e.target.closest('[data-acc]'); if (!b) return;
+        const k = b.closest('[data-g]').dataset.g, prov = T.db.get('proveedores', k), msg = texto(k);
+        if (b.dataset.acc === 'wa') { const t = String(prov.telefono).replace(/\D/g, ''); window.open(`https://wa.me/${t.length === 10 ? '57' + t : t}?text=${encodeURIComponent(msg)}`, '_blank', 'noopener'); }
+        if (b.dataset.acc === 'copiar') { try { await navigator.clipboard.writeText(msg); T.toast('Pedido copiado', 'ok'); } catch (err) { T.modal({ titulo: 'Copie el pedido', cuerpo: `<textarea rows="10" readonly>${T.esc(msg)}</textarea>` }); } }
+        if (b.dataset.acc === 'imprimir') T.imprimir(`<div class="recibo"><h5>Pedido</h5><div class="c">${T.esc(prov ? prov.nombre : 'Sin proveedor')}<br>${T.fecha(Date.now())}</div><hr><div style="white-space:pre-line">${T.esc(msg.split('\n').slice(1).join('\n'))}</div><hr><div>Total aprox.: ${T.money(totalDe(k))}</div></div>`);
+        if (b.dataset.acc === 'llego') T.ui.entrada({ esCompra: true, proveedor: prov ? prov.nombre : '', filas: grupos.get(k).filter(f => f.pedir > 0).map(f => ({ nombre: f.p.nombre, codigo: f.p.codigo, cantidad: unidades(f), costo: f.p.costo || 0, precio: f.p.precio })) });
+      };
+    },
     async render(el) {
       el.innerHTML = `<div class="cabeza"><h2>Compras</h2><div class="fila">
           ${T.auth.puede('ia.usar') ? `<button class="btn ia" id="foto">${T.ico('camara')} Foto de la factura</button>` : ''}
           <button class="btn pri" id="nueva">${T.ico('mas')} Compra</button><button class="btn" id="prov">${T.ico('mas')} Proveedor</button></div></div>
         <div class="pestanas" id="pes"></div><div id="cont"></div>`;
-      pestanas(T.$('#pes', el), [['compras', 'Compras'], ['deudas', 'Por pagar'], ['proveedores', 'Proveedores']], this.pestana, t => { this.pestana = t; this.render(el); });
+      pestanas(T.$('#pes', el), [['compras', 'Compras'], ['pedido', 'Pedido sugerido'], ['deudas', 'Por pagar'], ['proveedores', 'Proveedores']], this.pestana, t => { this.pestana = t; this.render(el); });
       const foto = T.$('#foto', el); if (foto) foto.onclick = () => T.ui.fotoIA('factura');
       T.$('#nueva', el).onclick = () => T.ui.entrada({ esCompra: true });
       T.$('#prov', el).onclick = async () => { if (await T.ui.editarProveedor()) { this.pestana = 'proveedores'; this.render(el); } };
       const cont = T.$('#cont', el);
+      if (this.pestana === 'pedido') return this.pedido(cont);
       if (this.pestana === 'proveedores') {
         cont.innerHTML = T.tabla([
           { t: 'Proveedor', v: p => `<b>${T.esc(p.nombre)}</b>${p.nit ? `<br><small class="suave">NIT ${T.esc(p.nit)}</small>` : ''}` },
@@ -84,7 +126,7 @@
 
   T.ui.cuenta = async (c, alCambiar) => {
     const [ventas, abonos] = await Promise.all([T.db.porIndice('ventas', 'clienteId', c.id), T.db.porIndice('abonos', 'clienteId', c.id)]);
-    const movs = [...ventas.filter(v => v.fiado > 0 && v.estado === 'completada').map(v => ({ fecha: v.fecha, txt: `Fiado · recibo ${v.numero}`, valor: v.fiado, v })), ...abonos.map(a => ({ fecha: a.fecha, txt: `Abono (${T.METODOS[a.metodo]})`, valor: -a.monto }))].sort((a, b) => b.fecha - a.fecha);
+    const movs = [...ventas.filter(v => (v.fiado || 0) - (v.fiadoDevuelto || 0) > 0 && v.estado === 'completada').map(v => ({ fecha: v.fecha, txt: `Fiado · recibo ${v.numero}${v.fiadoDevuelto ? ' (con devolución)' : ''}`, valor: v.fiado - (v.fiadoDevuelto || 0), v })), ...abonos.map(a => ({ fecha: a.fecha, txt: `Abono (${T.METODOS[a.metodo]})`, valor: -a.monto }))].sort((a, b) => b.fecha - a.fecha);
     const tel = String(c.telefono || '').replace(/\D/g, '');
     const m = T.modal({
       titulo: 'Cuenta de ' + c.nombre, ancho: 600,
@@ -169,12 +211,14 @@
           <button class="btn pri grande" id="abrir" style="width:100%;margin-top:14px">Abrir caja</button></div><div id="hist">${tablaHist}</div>`;
         T.$('#abrir', el).onclick = async () => { try { await T.neg.abrirCaja(T.aNum(T.$('#base', el).value)); T.toast('Caja abierta', 'ok'); this.render(el); } catch (e) { T.toast(e.message, 'error'); } };
       } else {
-        const r = await T.neg.resumenCaja(caja);
+        const r = await T.neg.resumenCaja(caja), ventasTurno = (await T.db.porIndice('ventas', 'cajaId', caja.id)).sort((a, b) => b.fecha - a.fecha);
         el.innerHTML = `<div class="cabeza"><div><h2>Caja ${T.esc(caja.numero)} <span class="etq ok">Abierta</span></h2><span class="suave">Abrió ${T.esc(caja.usuario)} · ${T.fechaHora(caja.apertura)}</span></div>
           <div class="fila">${T.auth.puede('caja.movimientos') ? `<button class="btn" data-m="gasto">Gasto</button><button class="btn" data-m="ingreso">Ingreso</button><button class="btn" data-m="retiro">Retiro</button>` : ''}<button class="btn pri" id="cerrar">Cerrar caja</button></div></div>
           <div class="rejilla dos"><div class="tarjeta"><h4>Efectivo</h4>${cuadro(caja, r)}</div><div class="tarjeta"><h4>Ventas por medio de pago</h4>${medios(r)}${r.abonos ? `<p class="suave" style="margin-top:8px">Abonos de fiados recibidos: ${T.money(r.abonos)}</p>` : ''}</div></div>
           <h3 style="margin:8px 0 10px">Movimientos del turno</h3>${T.tabla([{ t: 'Hora', v: m => T.hora(m.fecha) }, { t: 'Tipo', v: m => `<span class="etq ${m.tipo === 'ingreso' ? 'ok' : 'aviso'}">${TIPOS_CAJA[m.tipo]}</span>` }, { t: 'Concepto', v: m => T.esc(m.concepto) }, { t: 'Valor', cls: 'der num', v: m => T.money(m.monto) }, { t: 'Usuario', v: m => T.esc(m.usuario) }], r.movs, 'Sin gastos, ingresos ni retiros en este turno.')}
+          <h3 style="margin:22px 0 10px">Ventas del turno</h3><div id="ventas-turno">${T.ui.tablaVentas(ventasTurno, 'Todavía no hay ventas en este turno.')}</div>
           <div id="hist">${tablaHist}</div>`;
+        T.$('#ventas-turno', el).onclick = e => T.ui.accionVenta(e, ventasTurno, () => this.render(el));
         T.$$('[data-m]', el).forEach(b => b.onclick = async () => {
           const tipo = b.dataset.m, v = await T.pedir({
             titulo: { gasto: 'Registrar gasto', ingreso: 'Registrar ingreso', retiro: 'Retiro de efectivo' }[tipo], ancho: 400, campos: [
