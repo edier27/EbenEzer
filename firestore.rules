@@ -1,0 +1,64 @@
+rules_version = '2';
+
+// ════════════════════════════════════════════════════════════════════
+// TIENDA EBEN-EZER — Reglas de seguridad de Firestore (copia en la nube)
+//
+// MODELO
+//   • Cada tienda = una cuenta de Firebase Auth (correo y clave).
+//   • Sus datos viven en  tiendas/{uid}/datos/{tabla__id}
+//       s  = tabla (ventas, productos, movimientos, …)
+//       a  = fecha de última modificación del registro (milisegundos)
+//       e  = equipo que lo escribió
+//       j  = el registro completo en JSON
+//       _s = hora del servidor (para que los demás equipos lo reciban)
+//   • Solo la cuenta dueña puede leer o escribir SUS datos.
+//
+// REGLAS QUE SE HACEN CUMPLIR TAMBIÉN EN LA NUBE
+//   • Nada se puede borrar.
+//   • Bitácora, kárdex, abonos y movimientos de caja son inmutables:
+//     una vez escritos solo se acepta volver a escribir lo mismo.
+//   • Los demás registros solo aceptan versiones iguales o más nuevas.
+//
+// PUBLICAR:  firebase deploy --only firestore:rules
+// ATENCIÓN: use un proyecto de Firebase PROPIO para la tienda. Publicar
+// estas reglas en otro proyecto reemplaza las reglas que ese tenga.
+// ════════════════════════════════════════════════════════════════════
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function esDueno(uid) { return request.auth != null && request.auth.uid == uid; }
+
+    function tablas() {
+      return ['productos', 'clientes', 'proveedores', 'usuarios', 'config', 'cajas',
+              'movimientos', 'ventas', 'compras', 'abonos', 'cajaMovs', 'auditoria'];
+    }
+    function inmutables() { return ['movimientos', 'abonos', 'cajaMovs', 'auditoria']; }
+
+    function docValido(docId) {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['s', 'a', 'e', 'j', '_s'])
+          && d.s in tablas()
+          && docId.matches('^' + d.s + '__.+')
+          && d.a is number
+          && d.e is string
+          && d.j is string && d.j.size() < 900000
+          && d._s == request.time;
+    }
+
+    match /tiendas/{uid}/datos/{docId} {
+      allow read: if esDueno(uid);
+      allow create: if esDueno(uid) && docValido(docId);
+      allow update: if esDueno(uid) && docValido(docId)
+                    && request.resource.data.s == resource.data.s
+                    && (
+                      request.resource.data.j == resource.data.j
+                      || (!(resource.data.s in inmutables()) && request.resource.data.a >= resource.data.a)
+                    );
+      allow delete: if false;
+    }
+
+    // Todo lo demás está cerrado.
+    match /{cualquiera=**} { allow read, write: if false; }
+  }
+}
