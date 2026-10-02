@@ -72,7 +72,11 @@
         <aside class="tiquete">
           <div class="tiq-cab">
             <div class="titulo"><h3>Venta actual</h3><span class="etq" id="cuenta"></span></div>
-            <div class="cliente"><select id="cli" aria-label="Cliente"></select><button class="btn-ico" id="nuevo-cli" title="Cliente nuevo" aria-label="Cliente nuevo">${T.ico('mas')}</button></div>
+            <div class="cliente"><div class="buscador cli-buscar">${T.ico('clientes')}<input id="cli" placeholder="Cliente general · buscar cliente" autocomplete="off" aria-label="Buscar cliente" role="combobox" aria-expanded="false" aria-controls="cli-lista">
+                <button class="btn-ico oculto" id="cli-x" title="Quitar cliente" aria-label="Quitar cliente">${T.ico('x')}</button>
+                <div class="cli-lista oculto" id="cli-lista" role="listbox"></div></div>
+              <button class="btn-ico" id="nuevo-cli" title="Cliente nuevo" aria-label="Cliente nuevo">${T.ico('mas')}</button></div>
+            <div class="cli-info oculto" id="cli-info"></div>
           </div>
           <div class="lineas" id="lineas"></div>
           <div class="tiq-pie">
@@ -99,9 +103,37 @@
           : `<p class="vacio" style="grid-column:1/-1">${T.db.lista('productos').length ? 'Ningún producto coincide.' : 'Aún no hay productos. Vaya a Inventario para agregarlos.'}</p>`;
         return lista;
       };
+      // Cliente: buscador por nombre, celular o cédula. Vacío = cliente general.
+      const cli = T.$('#cli', el), cliLista = T.$('#cli-lista', el);
       const pintarCli = () => {
-        T.$('#cli', el).innerHTML = `<option value="">Cliente general</option>` + T.db.lista('clientes').sort((a, b) => a.nombre.localeCompare(b.nombre, 'es')).map(c => `<option value="${c.id}" ${c.id === clienteId ? 'selected' : ''}>${T.esc(c.nombre)}${c.saldo > 0 ? ' · debe ' + T.money(c.saldo) : ''}</option>`).join('');
+        const c = clienteId && T.db.get('clientes', clienteId);
+        if (!c) clienteId = '';
+        cli.value = c ? c.nombre : '';
+        T.$('#cli-x', el).classList.toggle('oculto', !c);
+        const info = T.$('#cli-info', el);
+        info.classList.toggle('oculto', !c);
+        if (c) info.innerHTML = `${c.saldo > 0 ? `<span class="etq ${c.saldo >= c.cupo ? 'mal' : 'aviso'}">Debe ${T.money(c.saldo)}</span>` : '<span class="etq ok">Al día</span>'}<span>Puede fiar ${T.money(Math.max(0, (c.cupo || 0) - (c.saldo || 0)))} más</span>`;
       };
+      const cerrarCli = () => { cliLista.classList.add('oculto'); cli.setAttribute('aria-expanded', 'false'); };
+      const buscarCli = () => {
+        const t = T.norm(cli.value);
+        const lista = T.db.lista('clientes').filter(c => !t || T.norm(`${c.nombre} ${c.telefono || ''} ${c.documento || ''}`).includes(t))
+          .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es')).slice(0, 8);
+        cliLista.innerHTML = `<button data-cli="" role="option">Cliente general<small>Venta sin nombre</small></button>` + lista.map(c => `<button data-cli="${c.id}" role="option"><span>${T.esc(c.nombre)}<small>${T.esc(c.telefono || 'Sin celular')}</small></span>${c.saldo > 0 ? `<span class="etq aviso">Debe ${T.money(c.saldo)}</span>` : ''}</button>`).join('')
+          + (t && !lista.length ? '<p class="suave">Ningún cliente con ese nombre. Use el botón + para crearlo.</p>' : '');
+        cliLista.classList.remove('oculto'); cli.setAttribute('aria-expanded', 'true');
+        return lista;
+      };
+      const elegirCli = id => { clienteId = id || ''; guardar(); pintarCli(); cerrarCli(); };
+      cli.onfocus = () => { cli.select(); buscarCli(); };
+      cli.oninput = buscarCli;
+      cli.onkeydown = e => {
+        if (e.key === 'Enter') { e.preventDefault(); const l = buscarCli(); elegirCli(cli.value.trim() && l[0] ? l[0].id : ''); q.focus(); }
+        if (e.key === 'Escape') { e.stopPropagation(); pintarCli(); cerrarCli(); cli.blur(); }
+      };
+      cli.onblur = () => setTimeout(() => { pintarCli(); cerrarCli(); }, 160);
+      cliLista.onmousedown = e => { const b = e.target.closest('[data-cli]'); if (b) { e.preventDefault(); elegirCli(b.dataset.cli); q.focus(); } };
+      T.$('#cli-x', el).onclick = () => elegirCli('');
       const pintar = () => {
         const t = totales();
         T.$('#lineas', el).innerHTML = carrito.length ? carrito.map((l, i) => `<div class="linea" data-i="${i}">
@@ -150,7 +182,6 @@
       };
       T.$('#cats', el).onclick = e => { const b = e.target.closest('[data-c]'); if (b) { categoria = b.dataset.c; pintarCats(); pintarProds(); } };
       T.$('#prods', el).onclick = e => { const b = e.target.closest('[data-p]'); if (b) agregar(T.db.get('productos', b.dataset.p)); };
-      T.$('#cli', el).onchange = e => { clienteId = e.target.value; guardar(); };
       T.$('#nuevo-cli', el).onclick = async () => { const c = await T.ui.editarCliente(); if (c) { clienteId = c.id; pintarCli(); guardar(); } };
 
       T.$('#lineas', el).onclick = async e => {

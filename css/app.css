@@ -228,7 +228,15 @@ a.chip:hover { border-color: var(--borde2); }
 .tiq-cab { padding: 13px 14px 12px; border-bottom: 1px solid var(--borde); display: grid; gap: 10px; }
 .tiq-cab .titulo { display: flex; align-items: center; justify-content: space-between; }
 .tiq-cab .cliente { display: flex; gap: 6px; align-items: center; }
-.tiq-cab select { flex: 1; min-width: 0; }
+.cli-buscar { flex: 1; min-width: 0; }
+.cli-buscar input { padding-right: 36px; }
+.cli-buscar #cli-x { position: absolute; right: 3px; top: 50%; translate: 0 -50%; width: 30px; height: 30px; }
+.cli-lista { position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 25; background: var(--panel); border: 1px solid var(--borde2); border-radius: var(--r); box-shadow: var(--sombra); padding: 4px; max-height: 320px; overflow-y: auto; }
+.cli-lista button { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; padding: 8px 10px; border: 0; border-radius: var(--r2); background: none; cursor: pointer; text-align: left; font-weight: 600; }
+.cli-lista button:hover { background: var(--panel2); }
+.cli-lista small { display: block; font-weight: 500; color: var(--suave); font-size: .78rem; }
+.cli-lista p { padding: 8px 10px; font-size: .86rem; }
+.cli-info { display: flex; align-items: center; gap: 8px; font-size: .82rem; color: var(--suave); }
 .tiq-cab .btn-ico { border: 1px solid var(--borde2); width: 38px; height: 38px; }
 .lineas { flex: 1; overflow-y: auto; min-height: 90px; scrollbar-width: thin; }
 .lineas .vacio { display: grid; place-items: center; gap: 10px; height: 100%; align-content: center; }
