@@ -6,7 +6,7 @@
 window.T = window.T || {};
 (function (T) {
   // Debe coincidir con version.json (ver README → "Cómo actualizar").
-  T.VERSION = '1.0.0';
+  T.VERSION = '1.1.0';
   T.vistas = {};
 
   T.$ = (s, el) => (el || document).querySelector(s);
@@ -120,6 +120,14 @@ window.T = window.T || {};
     codigo: '<path d="M4 5v14M8 5v14M11 5v14M15 5v14M18 5v14M20.5 5v14"/>'
   };
   T.ico = n => `<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICO[n] || ''}</svg>`;
+
+  // ── Identidad visual ──
+  // Logo: monograma "E" sobre el color de marca.
+  T.marca = () => '<svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#0d7a52"/><path d="M11 9.5v13M11 9.5h10.5M11 16h7.5M11 22.5h10.5" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  T.iniciales = n => String(n || '?').trim().split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase();
+  // Tono (0–359) estable para un texto: da color propio a cada categoría, producto sin foto o usuario.
+  T.tono = t => { let h = 0; for (const c of String(t || '')) h = (h * 31 + c.charCodeAt(0)) % 360; return h; };
+  T.corto = n => n >= 1e6 ? (n / 1e6).toFixed(n >= 1e7 ? 0 : 1).replace('.', ',') + ' M' : n >= 1000 ? Math.round(n / 1000) + ' mil' : String(Math.round(n || 0));
 
   // ── Avisos ──
   T.toast = (msg, tipo = 'info') => {

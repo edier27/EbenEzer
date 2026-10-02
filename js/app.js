@@ -3,18 +3,25 @@
 // ARRANQUE — instalación inicial, entrada de usuarios, menú y actualizaciones.
 // ════════════════════════════════════════════════════════════════════
 (function (T) {
+  // [vista, título, permiso, grupo del menú]
   const MENU = [
-    ['inicio', 'Inicio', null],
-    ['vender', 'Vender', 'ventas.crear'],
-    ['inventario', 'Inventario', 'inventario.ver'],
-    ['compras', 'Compras', 'compras.crear'],
-    ['clientes', 'Clientes y fiados', 'abonos.crear'],
-    ['caja', 'Caja', 'caja.operar'],
-    ['reportes', 'Reportes', 'reportes.ver'],
-    ['ia', 'Asistente IA', 'ia.usar'],
-    ['auditoria', 'Bitácora', 'auditoria.ver'],
-    ['config', 'Configuración', null]
+    ['inicio', 'Inicio', null, 'Operación'],
+    ['vender', 'Vender', 'ventas.crear', 'Operación'],
+    ['caja', 'Caja', 'caja.operar', 'Operación'],
+    ['clientes', 'Clientes y fiados', 'abonos.crear', 'Operación'],
+    ['inventario', 'Inventario', 'inventario.ver', 'Mercancía'],
+    ['compras', 'Compras', 'compras.crear', 'Mercancía'],
+    ['reportes', 'Reportes', 'reportes.ver', 'Control'],
+    ['ia', 'Asistente', 'ia.usar', 'Control'],
+    ['auditoria', 'Bitácora', 'auditoria.ver', 'Control'],
+    ['config', 'Configuración', null, 'Control']
   ];
+  // Pantalla de entrada: panel de marca a la izquierda, formulario a la derecha.
+  const portada = (titulo, sub, cuerpo) => `<div class="portada">
+      <aside class="portada-marca"><div>${T.marca()}<h1>${T.esc(titulo)}</h1><p>${T.esc(sub)}</p></div>
+        <ul><li>${T.ico('vender')} Ventas, caja y fiados</li><li>${T.ico('inventario')} Inventario con kárdex</li><li>${T.ico('auditoria')} Todo queda registrado</li></ul>
+        <footer>Versión ${T.VERSION}</footer></aside>
+      <main class="portada-form"><div class="portada-caja">${cuerpo}</div></main></div>`;
 
   // Cambios de datos entre versiones. Para una versión nueva que necesite
   // transformar datos, agregue aquí { n: 2, fn: async () => {...} } — se ejecuta una sola vez.
@@ -39,7 +46,7 @@
         setInterval(() => this.buscarActualizacion(), 30 * 60000);
       } catch (e) {
         console.error(e);
-        raiz().innerHTML = `<div class="portada"><div class="tarjeta"><h1>No se pudo iniciar</h1><p class="texto">${T.esc(e.message || e)}</p><button class="btn pri" onclick="location.reload()">Reintentar</button></div></div>`;
+        raiz().innerHTML = `<div class="portada solo"><main class="portada-form"><div class="portada-caja"><h2>No se pudo iniciar</h2><p class="texto suave">${T.esc(e.message || e)}</p><button class="btn pri" onclick="location.reload()">Reintentar</button></div></main></div>`;
       }
     },
 
@@ -59,13 +66,11 @@
         { id: 'usuario', label: 'Usuario', req: true, medio: true, valor: 'admin' },
         { id: 'pin', label: 'Clave (mínimo 4)', tipo: 'password', req: true, medio: true }
       ];
-      raiz().innerHTML = `<div class="portada"><div class="tarjeta">
-        <div class="logo">🛒</div><h1>Bienvenido</h1>
-        <p class="texto suave">Vamos a dejar lista la tienda. Estos datos salen en los recibos y se pueden cambiar después.</p>
+      raiz().innerHTML = portada('Punto de venta', 'Configure la tienda en un minuto y empiece a vender.', `
+        <h2>Crear la tienda</h2><p class="suave">Estos datos salen en los recibos y se pueden cambiar después.</p>
         ${T.form(campos)}
-        <div class="fila" style="margin-top:16px"><button class="btn pri grande crece" id="crear">Crear la tienda</button></div>
-        <p class="suave centro" style="margin-top:12px"><button class="btn mini" id="de-nube">${T.ico('nube')} Ya tengo la tienda en la nube</button> <button class="btn mini" id="restaurar">${T.ico('subir')} Tengo un respaldo</button></p>
-      </div></div>`;
+        <button class="btn pri grande" id="crear" style="width:100%;margin-top:18px">Crear la tienda</button>
+        <div class="enlaces"><button class="btn" id="de-nube">${T.ico('nube')} Ya tengo la tienda en la nube</button><button class="btn" id="restaurar">${T.ico('subir')} Tengo un respaldo</button></div>`);
       T.$('#crear').onclick = async () => {
         try {
           const v = T.leerForm(raiz(), campos);
@@ -103,12 +108,11 @@
     login() {
       const us = T.db.lista('usuarios').filter(u => u.activo !== false).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
       let sel = us.length === 1 ? us[0].id : null;
-      raiz().innerHTML = `<div class="portada"><div class="tarjeta">
-        <div class="logo">🛒</div><h1>${T.esc(negocio().nombre || 'Tienda')}</h1><p class="suave">¿Quién va a trabajar?</p>
-        <div class="usuarios-login">${us.map(u => `<button data-u="${u.id}" class="${u.id === sel ? 'activo' : ''}">${T.esc(u.nombre)}<small>${T.esc(T.roles()[u.rol].nombre)}</small></button>`).join('')}</div>
+      raiz().innerHTML = portada(negocio().nombre || 'Tienda', 'Punto de venta', `
+        <h2>Iniciar turno</h2><p class="suave">Elija su usuario y escriba la clave.</p>
+        <div class="usuarios-login">${us.map(u => `<button data-u="${u.id}" class="${u.id === sel ? 'activo' : ''}"><i class="avatar" style="--h:${T.tono(u.nombre)}">${T.esc(T.iniciales(u.nombre))}</i><span>${T.esc(u.nombre)}<small>${T.esc(T.roles()[u.rol].nombre)}</small></span></button>`).join('')}</div>
         <label class="campo"><span>Clave</span><input type="password" id="pin" autocomplete="off"></label>
-        <button class="btn pri grande" id="entrar" style="width:100%;margin-top:14px">Entrar</button>
-      </div></div>`;
+        <button class="btn pri grande" id="entrar" style="width:100%;margin-top:16px">Entrar</button>`);
       const pin = T.$('#pin');
       T.$$('[data-u]').forEach(b => b.onclick = () => { sel = b.dataset.u; T.$$('[data-u]').forEach(x => x.classList.toggle('activo', x === b)); pin.focus(); });
       const entrar = async () => {
@@ -126,22 +130,33 @@
       const u = T.auth.usuario, menu = MENU.filter(([id, , p]) => !p || T.auth.puede(p) || (id === 'clientes' && T.auth.puede('clientes.editar')));
       raiz().innerHTML = `<div id="app">
         <aside id="lateral">
-          <div class="marca"><b>${T.esc(negocio().nombre || 'Tienda')}</b><small>v${T.VERSION}</small></div>
-          <nav id="nav">${menu.map(([id, t]) => `<a href="#${id}" data-v="${id}">${T.ico(id)}<span>${t}</span></a>`).join('')}</nav>
+          <div class="marca">${T.marca()}<div><b>${T.esc(negocio().nombre || 'Tienda')}</b><small>Punto de venta</small></div></div>
+          <nav id="nav">${menu.map(([id, t, , g], i) => `${!i || menu[i - 1][3] !== g ? `<h5>${g}</h5>` : ''}<a href="#${id}" data-v="${id}">${T.ico(id)}<span>${t}</span></a>`).join('')}</nav>
           <div class="pie-lateral">
             <button class="estado-sync" id="est-sync" title="Estado de las copias"></button>
-            <div class="quien"><div style="min-width:0"><b>${T.esc(u.nombre)}</b><span class="suave">${T.esc(T.roles()[u.rol].nombre)}</span></div>
+            <div class="quien"><i class="avatar" style="--h:${T.tono(u.nombre)}">${T.esc(T.iniciales(u.nombre))}</i><div><b>${T.esc(u.nombre)}</b><span>${T.esc(T.roles()[u.rol].nombre)}</span></div>
               <button class="btn-ico" id="salir" title="Cerrar sesión" aria-label="Cerrar sesión">${T.ico('salir')}</button></div>
           </div>
         </aside>
-        <div style="min-width:0"><div id="barra-movil"><button class="btn-ico" id="abrir-menu" aria-label="Menú">${T.ico('menu')}</button><b id="titulo-movil"></b></div>
+        <div id="contenido"><header id="barra"><button class="btn-ico" id="abrir-menu" aria-label="Menú">${T.ico('menu')}</button><span class="seccion" id="titulo-movil"></span>
+          <a class="chip" id="chip-caja" href="#caja"></a><span class="chip reloj" id="reloj"></span></header>
         <main id="principal"></main></div></div>`;
       T.$('#salir').onclick = async () => { await T.auth.salir(); this.login(); };
       T.$('#abrir-menu').onclick = () => T.$('#app').classList.toggle('menu-abierto');
       T.$('#app').addEventListener('click', e => { if (e.target.id === 'app' || e.target.closest('#nav a')) T.$('#app').classList.remove('menu-abierto'); });
       T.$('#est-sync').onclick = () => { location.hash = '#config'; T.vistas.config.pestana = 'copias'; this.navegar(); };
       this.pintarSync();
+      this.pintarBarra();
       this.navegar();
+    },
+
+    // Barra superior: estado de la caja de este equipo y hora.
+    pintarBarra() {
+      const chip = T.$('#chip-caja'), reloj = T.$('#reloj');
+      if (!chip) return;
+      const c = T.neg.cajaAbierta();
+      chip.innerHTML = `<i class="punto ${c ? 'ok' : ''}"></i>${c ? 'Caja ' + T.esc(c.numero) + ' abierta' : 'Caja cerrada'}`;
+      reloj.textContent = new Date().toLocaleDateString('es-CO', { weekday: 'short', day: 'numeric', month: 'short' }) + ' · ' + T.hora(Date.now());
     },
 
     async pintarSync() {
@@ -197,6 +212,8 @@
 
   window.addEventListener('hashchange', () => T.app.navegar());
   T.on('sync', () => T.app.pintarSync());
+  T.on('datos', tablas => { if (tablas.includes('cajas')) T.app.pintarBarra(); });
+  setInterval(() => T.app.pintarBarra(), 20000);
   T.on('pendiente', T.debounce(() => T.app.pintarSync(), 400));
 
   // Cierre de sesión por inactividad (regla "bloqueoMin").
@@ -212,22 +229,23 @@
     async render(el) {
       const hoy = T.dia(), fin = T.finDia(hoy), verPlata = T.auth.puede('reportes.ver'), verUtil = T.auth.puede('utilidad.ver');
       const [d, sem] = await Promise.all([T.neg.resumen(T.iniDia(hoy), fin), T.neg.resumen(T.iniDia(hoy) - 6 * 86400000, fin)]);
+      const ayer = sem.porDia[T.dia(T.iniDia(hoy) - 86400000)] || 0, cambio = ayer ? Math.round((d.total - ayer) / ayer * 100) : null;
       const al = T.neg.alertas(), caja = T.neg.cajaAbierta(), deben = T.db.lista('clientes').filter(c => c.saldo > 0);
       const dias = Array.from({ length: 7 }, (_, i) => T.dia(T.iniDia(hoy) - (6 - i) * 86400000));
       const max = Math.max(1, ...dias.map(x => sem.porDia[x] || 0)), sinResp = T.respaldo.diasSin();
       const lista = (arr, f, vacio) => arr.length ? `<ul class="lista-simple">${arr.slice(0, 6).map(f).join('')}</ul>${arr.length > 6 ? `<small class="suave">y ${arr.length - 6} más…</small>` : ''}` : `<p class="suave">${vacio}</p>`;
       el.innerHTML = `
-        <div class="cabeza"><div><h2>Hola, ${T.esc(T.auth.usuario.nombre.split(' ')[0])}</h2><span class="suave">${new Date().toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long' })}</span></div>
+        <div class="cabeza"><div><h2>Resumen del día</h2><span class="suave">${new Date().toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</span></div>
           <div class="fila">${T.auth.puede('ventas.crear') ? `<a class="btn pri" href="#vender">${T.ico('vender')} Vender</a>` : ''}${T.auth.puede('inventario.editar') ? `<button class="btn ia" id="foto">${T.ico('camara')} Foto al inventario</button>` : ''}</div></div>
         ${!T.sync.hub && !T.sync.nube && (sinResp === null || sinResp >= 1) ? `<div class="banda aviso">${T.ico('alerta')}<span>${sinResp === null ? 'Aún no hay ninguna copia de seguridad.' : `Hace ${sinResp} día(s) no se hace copia de seguridad.`} Los datos solo están en este navegador.</span>${T.auth.puede('respaldo.gestionar') ? '<button class="btn" id="resp">Descargar copia</button>' : ''}</div>` : ''}
         ${!caja && T.auth.puede('caja.operar') ? `<div class="banda">${T.ico('caja')}<span>La caja está cerrada.</span><a class="btn" href="#caja">Abrir caja</a></div>` : ''}
         ${verPlata ? `<div class="rejilla">
-          <div class="tarjeta kpi"><h4>Ventas de hoy</h4><b>${T.money(d.total)}</b><small>${d.n} tiquete(s)${d.anuladas ? ` · ${d.anuladas} anulada(s)` : ''}</small></div>
+          <div class="tarjeta kpi principal"><h4>Ventas de hoy</h4><b>${T.money(d.total)}</b><small>${cambio === null ? '' : `<span class="delta ${cambio < 0 ? 'baja' : ''}">${cambio > 0 ? '+' : ''}${cambio}% vs. ayer</span>`}${d.n} tiquete${d.n === 1 ? '' : 's'}${d.anuladas ? ` · ${d.anuladas} anulada(s)` : ''}</small></div>
           ${verUtil ? `<div class="tarjeta kpi"><h4>Utilidad bruta hoy</h4><b>${T.money(d.utilidad)}</b><small>${d.total ? Math.round(d.utilidad / d.total * 100) : 0}% de margen</small></div>` : ''}
           <div class="tarjeta kpi"><h4>Fiado hoy</h4><b>${T.money(d.fiado)}</b><small>Abonos recibidos: ${T.money(d.abonos)}</small></div>
           <div class="tarjeta kpi"><h4>Por cobrar</h4><b>${T.money(deben.reduce((a, c) => a + c.saldo, 0))}</b><small>${deben.length} cliente(s)</small></div>
         </div>
-        <div class="tarjeta" style="margin-bottom:14px"><h4>Ventas últimos 7 días</h4><div class="barras">${dias.map(x => `<div title="${T.money(sem.porDia[x] || 0)}"><i style="height:${Math.round((sem.porDia[x] || 0) / max * 100)}%"></i><span>${new Date(T.iniDia(x)).toLocaleDateString('es-CO', { weekday: 'short', day: 'numeric' })}</span></div>`).join('')}</div></div>` : ''}
+        <div class="tarjeta" style="margin-bottom:14px"><h4>Ventas de los últimos 7 días <span class="etq">${T.money(sem.total)}</span></h4><div class="barras">${dias.map(x => `<div class="${x === hoy ? 'hoy' : ''}" title="${T.money(sem.porDia[x] || 0)}"><em>${sem.porDia[x] ? T.corto(sem.porDia[x]) : ''}</em><i style="height:${Math.round((sem.porDia[x] || 0) / max * 82)}%"></i><span>${new Date(T.iniDia(x)).toLocaleDateString('es-CO', { weekday: 'short', day: 'numeric' })}</span></div>`).join('')}</div></div>` : ''}
         <div class="rejilla dos">
           <div class="tarjeta"><h4>Agotados y por agotarse <span class="etq ${al.agotados.length + al.bajos.length ? 'aviso' : 'ok'}">${al.agotados.length + al.bajos.length}</span></h4>
             ${lista([...al.bajos, ...al.agotados], p => `<li><span>${T.esc(p.nombre)}</span><span class="etq ${p.stock > 0 ? 'aviso' : 'mal'}">${T.cant(p.stock)}</span></li>`, 'Todo tiene existencias suficientes.')}</div>

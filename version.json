@@ -1,5 +1,8 @@
 {
-  "version": "1.0.0",
-  "fecha": "2026-10-01",
-  "notas": ["Primera versión: ventas, inventario con foto e IA, compras, fiados, caja, reportes, bitácora y copias."]
+  "version": "1.1.0",
+  "fecha": "2026-10-02",
+  "notas": [
+    "Nuevo diseño: menú lateral, barra de caja, panel de ventas, tablero y pantalla de entrada.",
+    "La nube viene conectada: solo correo y clave."
+  ]
 }

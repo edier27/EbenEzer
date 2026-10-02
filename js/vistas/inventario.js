@@ -103,7 +103,7 @@
     const fotos = [];
     const m = T.modal({
       titulo: 'Agregar con foto', ancho: 560,
-      cuerpo: `<div class="metodos" style="grid-template-columns:1fr 1fr"><button data-modo="productos">📦 Productos o estante</button><button data-modo="factura">🧾 Factura del proveedor</button></div>
+      cuerpo: `<div class="metodos" style="grid-template-columns:1fr 1fr"><button data-modo="productos">${T.ico('inventario')} Productos o estante</button><button data-modo="factura">${T.ico('lista')} Factura del proveedor</button></div>
         <p class="suave" id="ayuda"></p>
         <div class="fila" style="margin-top:12px"><button class="btn pri crece" id="tomar">${T.ico('camara')} Tomar foto</button><button class="btn crece" id="elegir">Elegir del equipo</button></div>
         <div class="fotos-ia" id="fotos"></div><div id="estado"></div>`,
@@ -289,7 +289,7 @@
           (!pals.length || p.codigo === texto.trim() || pals.every(w => T.norm(`${p.nombre} ${p.marca || ''} ${p.codigo || ''}`).includes(w)))).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
         T.$('#resumen', el).textContent = `${lista.length} producto(s)` + (verCosto ? ` · Vale a costo ${T.money(lista.reduce((a, p) => a + Math.max(0, p.stock) * (p.costo || 0), 0))} · a precio de venta ${T.money(lista.reduce((a, p) => a + Math.max(0, p.stock) * (p.precio || 0), 0))}` : '');
         T.$('#tabla', el).innerHTML = T.tabla([
-          { t: '', v: p => p.foto ? `<img class="mini-foto" src="${p.foto}" alt="" loading="lazy">` : '<span class="mini-foto"></span>' },
+          { t: '', v: p => p.foto ? `<img class="mini-foto" src="${p.foto}" alt="" loading="lazy">` : `<span class="mini-foto ini" style="--h:${T.tono(p.categoria || p.nombre)}">${T.esc(T.iniciales(p.nombre))}</span>` },
           { t: 'Producto', v: p => `<b>${T.esc(p.nombre)}</b><br><small class="suave">${T.esc([p.categoria, p.marca, p.codigo].filter(Boolean).join(' · '))}</small>` },
           ...(verCosto ? [{ t: 'Costo', cls: 'der num', v: p => T.money(p.costo) }] : []),
           { t: 'Precio', cls: 'der num', v: p => `<b>${T.money(p.precio)}</b>${verCosto && p.costo && p.precio ? `<br><small class="suave">${Math.round((p.precio - p.costo) / p.precio * 100)}% margen</small>` : ''}` },

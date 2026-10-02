@@ -65,16 +65,25 @@
       if (g && !carrito.length) { carrito = (g.carrito || []).filter(l => T.db.get('productos', l.productoId)); clienteId = g.clienteId || ''; }
       el.innerHTML = `<div class="pos">
         <section>
-          <div class="fila"><div class="buscador crece">${T.ico('buscar')}<input id="q" placeholder="Buscar producto o pasar código de barras" autocomplete="off" autofocus></div>
-            <button class="btn" id="scan" title="Leer código con la cámara">${T.ico('codigo')}</button></div>
+          <div class="pos-buscar"><div class="buscador">${T.ico('buscar')}<input id="q" placeholder="Buscar producto o pasar el código de barras" autocomplete="off" autofocus><kbd>F4</kbd></div>
+            <button class="btn" id="scan" title="Leer código con la cámara" aria-label="Leer código con la cámara">${T.ico('codigo')}</button></div>
           <div class="chips" id="cats"></div><div class="prods" id="prods"></div>
         </section>
-        <aside class="tarjeta tiquete">
-          <header>${T.ico('clientes')}<select id="cli" aria-label="Cliente"></select><button class="btn-ico" id="nuevo-cli" title="Cliente nuevo">${T.ico('mas')}</button></header>
-          <div class="lineas" id="lineas"></div><div class="totales" id="totales"></div>
-          <footer><button class="btn pri grande cobrar" id="cobrar">Cobrar (F2)</button>
-            <button class="btn mini" id="desc">Descuento</button><button class="btn mini" id="espera">En espera</button><button class="btn mini" id="vaciar">Vaciar</button></footer>
-        </aside></div>`;
+        <aside class="tiquete">
+          <div class="tiq-cab">
+            <div class="titulo"><h3>Venta actual</h3><span class="etq" id="cuenta"></span></div>
+            <div class="cliente"><select id="cli" aria-label="Cliente"></select><button class="btn-ico" id="nuevo-cli" title="Cliente nuevo" aria-label="Cliente nuevo">${T.ico('mas')}</button></div>
+          </div>
+          <div class="lineas" id="lineas"></div>
+          <div class="tiq-pie">
+            <div class="totales" id="totales"></div>
+            <div class="tiq-acc"><button class="btn" id="desc">Descuento</button><button class="btn" id="espera">En espera</button><button class="btn" id="vaciar">Vaciar</button></div>
+            <button class="cobrar" id="cobrar"><span>Cobrar</span><kbd>F2</kbd></button>
+          </div>
+        </aside>
+        <button class="pos-flota oculto" id="flota"></button></div>`;
+      // En celular la venta queda debajo de los productos: esta barra la mantiene a la vista.
+      T.$('#flota', el).onclick = () => T.$('.tiquete', el).scrollIntoView({ behavior: 'smooth', block: 'start' });
       const q = T.$('#q', el);
       const pintarCats = () => {
         T.$('#cats', el).innerHTML = ['', ...T.categorias()].map(c => `<button data-c="${T.esc(c)}" class="${c === categoria ? 'activo' : ''}">${T.esc(c || 'Todo')}</button>`).join('');
@@ -83,7 +92,10 @@
         const t = T.norm(q.value), pals = t.split(/\s+/).filter(Boolean);
         const lista = T.db.lista('productos').filter(p => p.activo !== false && (!categoria || p.categoria === categoria) &&
           (!t || p.codigo === q.value.trim() || pals.every(w => T.norm(p.nombre + ' ' + (p.marca || '')).includes(w)))).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es')).slice(0, 60);
-        T.$('#prods', el).innerHTML = lista.length ? lista.map(p => `<button class="prod ${p.stock <= 0 ? 'agotado' : ''}" data-p="${p.id}">${p.foto ? `<img src="${p.foto}" alt="" loading="lazy">` : ''}<b>${T.esc(p.nombre)}</b><span class="precio">${T.money(p.precio)}</span><small>${p.stock <= 0 ? 'Agotado' : 'Hay ' + T.cant(p.stock)}</small></button>`).join('')
+        T.$('#prods', el).innerHTML = lista.length ? lista.map(p => `<button class="prod ${p.stock <= 0 ? 'agotado' : ''}" data-p="${p.id}">
+            <span class="prod-img" style="--h:${T.tono(p.categoria || p.nombre)}">${p.foto ? `<img src="${p.foto}" alt="" loading="lazy">` : T.esc(T.iniciales(p.nombre))}</span>
+            <span class="prod-nom">${T.esc(p.nombre)}</span>
+            <span class="prod-pie"><span class="precio">${T.money(p.precio)}</span><small class="${p.stock > 0 && p.stockMin > 0 && p.stock <= p.stockMin ? 'poco' : ''}">${p.stock <= 0 ? 'Agotado' : T.cant(p.stock) + (p.unidad && p.unidad !== 'und' ? ' ' + p.unidad : ' und')}</small></span></button>`).join('')
           : `<p class="vacio" style="grid-column:1/-1">${T.db.lista('productos').length ? 'Ningún producto coincide.' : 'Aún no hay productos. Vaya a Inventario para agregarlos.'}</p>`;
         return lista;
       };
@@ -93,11 +105,17 @@
       const pintar = () => {
         const t = totales();
         T.$('#lineas', el).innerHTML = carrito.length ? carrito.map((l, i) => `<div class="linea" data-i="${i}">
-          <span class="nom">${T.esc(l.nombre)}</span><b class="num">${T.money(l.precio * l.cantidad - (l.descuento || 0))}</b>
-          <div class="ctrl"><button class="btn-ico" data-a="menos" aria-label="Menos">${T.ico('menos')}</button><input type="number" step="any" inputmode="decimal" value="${l.cantidad}" aria-label="Cantidad"><button class="btn-ico" data-a="mas" aria-label="Más">${T.ico('mas')}</button>
-            <button class="precio-u num" data-a="precio" title="Cambiar precio">${T.money(l.precio)}${l.unidad !== 'und' ? '/' + l.unidad : ''}</button>${l.descuento ? `<span class="etq aviso">−${T.money(l.descuento)}</span>` : ''}
-            <button class="btn-ico quitar" data-a="quitar" aria-label="Quitar">${T.ico('borrar')}</button></div></div>`).join('')
-          : '<p class="vacio">Busque un producto o pase el código de barras.</p>';
+          <span class="paso"><button data-a="menos" aria-label="Menos">${T.ico('menos')}</button><input type="number" step="any" inputmode="decimal" value="${l.cantidad}" aria-label="Cantidad"><button data-a="mas" aria-label="Más">${T.ico('mas')}</button></span>
+          <span class="nom" title="${T.esc(l.nombre)}">${T.esc(l.nombre)}</span><span class="tot num">${T.money(l.precio * l.cantidad - (l.descuento || 0))}</span>
+          <span class="det"><button class="precio-u num" data-a="precio" title="Cambiar precio">${T.money(l.precio)}${l.unidad !== 'und' ? '/' + l.unidad : ' c/u'}</button>${l.descuento ? `<span class="etq aviso">−${T.money(l.descuento)}</span>` : ''}</span>
+          <button class="btn-ico quitar" data-a="quitar" aria-label="Quitar" title="Quitar">${T.ico('x')}</button></div>`).join('')
+          : `<div class="vacio">${T.ico('vender')}<span>Busque un producto o pase<br>el código de barras</span></div>`;
+        const unidades = carrito.reduce((a, l) => a + (l.unidad === 'und' ? l.cantidad : 1), 0);
+        T.$('#cuenta', el).textContent = carrito.length ? `${T.cant(unidades)} artículo${unidades === 1 ? '' : 's'}` : 'Vacía';
+        T.$('#flota', el).classList.toggle('oculto', !carrito.length);
+        T.$('#flota', el).innerHTML = `<span>${T.cant(unidades)} artículo${unidades === 1 ? '' : 's'} · Ver venta</span><b class="num">${T.money(t.total)}</b>`;
+        const enEspera = T.db.loc('espera', []).length;
+        T.$('#espera', el).textContent = carrito.length || !enEspera ? 'En espera' : `Recuperar (${enEspera})`;
         T.$('#totales', el).innerHTML = `${t.descuento ? `<div><span>Subtotal</span><span class="num">${T.money(t.subtotal)}</span></div><div><span>Descuento</span><span class="num">−${T.money(t.descuento)}</span></div>` : ''}
           ${t.ajuste ? `<div><span>Redondeo</span><span class="num">${T.money(t.ajuste)}</span></div>` : ''}
           <div class="total"><span>Total</span><span class="num">${T.money(t.total)}</span></div>`;

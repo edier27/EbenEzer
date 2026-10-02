@@ -2,7 +2,7 @@
 // Service worker: permite abrir la tienda sin internet.
 // Estrategia "red primero": siempre que hay conexión se usa la versión
 // más nueva de los archivos; sin conexión se usa la última guardada.
-const CACHE = 'tienda-v1';
+const CACHE = 'tienda-v2';
 const ARCHIVOS = ['./', 'index.html', 'css/app.css', 'manifest.json', 'icon.svg', 'version.json',
   'js/core.js', 'js/db.js', 'js/reglas.js', 'js/neg.js', 'js/ia.js', 'js/sync.js', 'js/app.js',
   'js/vistas/vender.js', 'js/vistas/inventario.js', 'js/vistas/gestion.js', 'js/vistas/reportes.js', 'js/vistas/config.js'];
