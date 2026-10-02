@@ -1,7 +1,8 @@
 {
-  "version": "1.2.0",
+  "version": "1.3.0",
   "fecha": "2026-10-02",
   "notas": [
+    "Nuevo diseño corporativo azul y rojo con menú superior.",
     "Devoluciones parciales: el cliente puede devolver algunos productos de una venta.",
     "Presentaciones: vender y comprar por paca, caja o six-pack.",
     "Pedido sugerido a proveedores con envío por WhatsApp.",

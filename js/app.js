@@ -8,7 +8,7 @@
     ['inicio', 'Inicio', null, 'Operación'],
     ['vender', 'Vender', 'ventas.crear', 'Operación'],
     ['caja', 'Caja', 'caja.operar', 'Operación'],
-    ['clientes', 'Clientes y fiados', 'abonos.crear', 'Operación'],
+    ['clientes', 'Clientes', 'abonos.crear', 'Operación'],
     ['inventario', 'Inventario', 'inventario.ver', 'Mercancía'],
     ['compras', 'Compras', 'compras.crear', 'Mercancía'],
     ['reportes', 'Reportes', 'reportes.ver', 'Control'],
@@ -129,18 +129,21 @@
     armar() {
       const u = T.auth.usuario, menu = MENU.filter(([id, , p]) => !p || T.auth.puede(p) || (id === 'clientes' && T.auth.puede('clientes.editar')));
       raiz().innerHTML = `<div id="app">
-        <aside id="lateral">
-          <div class="marca">${T.marca()}<div><b>${T.esc(negocio().nombre || 'Tienda')}</b><small>Punto de venta</small></div></div>
-          <nav id="nav">${menu.map(([id, t, , g], i) => `${!i || menu[i - 1][3] !== g ? `<h5>${g}</h5>` : ''}<a href="#${id}" data-v="${id}">${T.ico(id)}<span>${t}</span></a>`).join('')}</nav>
-          <div class="pie-lateral">
-            <button class="estado-sync" id="est-sync" title="Estado de las copias"></button>
-            <div class="quien"><i class="avatar" style="--h:${T.tono(u.nombre)}">${T.esc(T.iniciales(u.nombre))}</i><div><b>${T.esc(u.nombre)}</b><span>${T.esc(T.roles()[u.rol].nombre)}</span></div>
-              <button class="btn-ico" id="salir" title="Cerrar sesión" aria-label="Cerrar sesión">${T.ico('salir')}</button></div>
+        <header id="cabecera">
+          <div class="cab-sup">
+            <button class="btn-ico" id="abrir-menu" aria-label="Menú">${T.ico('menu')}</button>
+            <a class="marca" href="#inicio">${T.marca()}<div><b>${T.esc(negocio().nombre || 'Tienda')}</b><small>Punto de venta</small></div></a>
+            <span class="seccion" id="titulo-movil"></span>
+            <div class="cab-der">
+              <a class="chip" id="chip-caja" href="#caja"></a><span class="chip reloj" id="reloj"></span>
+              <button class="estado-sync" id="est-sync" title="Estado de las copias"></button>
+              <div class="quien"><i class="avatar" style="--h:${T.tono(u.nombre)}">${T.esc(T.iniciales(u.nombre))}</i><div><b>${T.esc(u.nombre)}</b><span>${T.esc(T.roles()[u.rol].nombre)}</span></div>
+                <button class="btn-ico" id="salir" title="Cerrar sesión" aria-label="Cerrar sesión">${T.ico('salir')}</button></div>
+            </div>
           </div>
-        </aside>
-        <div id="contenido"><header id="barra"><button class="btn-ico" id="abrir-menu" aria-label="Menú">${T.ico('menu')}</button><span class="seccion" id="titulo-movil"></span>
-          <a class="chip" id="chip-caja" href="#caja"></a><span class="chip reloj" id="reloj"></span></header>
-        <main id="principal"></main></div></div>`;
+          <nav id="nav">${menu.map(([id, t]) => `<a href="#${id}" data-v="${id}">${T.ico(id)}<span>${t}</span></a>`).join('')}</nav>
+        </header>
+        <main id="principal"></main></div>`;
       T.$('#salir').onclick = async () => { await T.auth.salir(); this.login(); };
       T.$('#abrir-menu').onclick = () => T.$('#app').classList.toggle('menu-abierto');
       T.$('#app').addEventListener('click', e => { if (e.target.id === 'app' || e.target.closest('#nav a')) T.$('#app').classList.remove('menu-abierto'); });

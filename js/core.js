@@ -6,7 +6,7 @@
 window.T = window.T || {};
 (function (T) {
   // Debe coincidir con version.json (ver README → "Cómo actualizar").
-  T.VERSION = '1.2.0';
+  T.VERSION = '1.3.0';
   T.vistas = {};
 
   T.$ = (s, el) => (el || document).querySelector(s);
@@ -123,7 +123,7 @@ window.T = window.T || {};
 
   // ── Identidad visual ──
   // Logo: monograma "E" sobre el color de marca.
-  T.marca = () => '<svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#0d7a52"/><path d="M11 9.5v13M11 9.5h10.5M11 16h7.5M11 22.5h10.5" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  T.marca = () => '<svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#e31b23"/><path d="M11 9.5v13M11 9.5h10.5M11 16h7.5M11 22.5h10.5" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   T.iniciales = n => String(n || '?').trim().split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase();
   // Tono (0–359) estable para un texto: da color propio a cada categoría, producto sin foto o usuario.
   T.tono = t => { let h = 0; for (const c of String(t || '')) h = (h * 31 + c.charCodeAt(0)) % 360; return h; };
