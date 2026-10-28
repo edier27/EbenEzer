@@ -268,6 +268,7 @@
             <label class="campo check" style="margin-top:10px"><input type="checkbox" id="mixto"><span>Pago mixto (parte con otro medio)</span></label>
             <div id="mix" class="form oculto"><label class="campo medio"><span>Otro medio</span><select id="m2">${Object.entries(T.METODOS).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></label>
               <label class="campo medio"><span>Valor con ese medio</span><input type="number" id="v2" inputmode="numeric"></label></div>
+            <div id="fiar" class="fiar oculto"></div>
             <div class="cambio" id="cambio"></div>`,
           botones: [{ txt: 'Cancelar', cls: 'sec' }, { txt: 'Registrar venta', cls: 'pri grande', id: 'ok', fn: () => registrar() }]
         });
@@ -276,6 +277,45 @@
           const v2 = T.$('#mixto', c).checked ? Math.min(t.total, Math.max(0, T.red(T.aNum(T.$('#v2', c).value)))) : 0;
           return { v2, m2: T.$('#m2', c).value, v1: t.total - v2 };
         };
+        // ── A quién se le fía: se elige o se busca aquí mismo (es el mismo cliente de la venta) ──
+        let buscando = false;
+        const fiadoDe = p => (metodo === 'fiado' ? p.v1 : 0) + (p.v2 && p.m2 === 'fiado' ? p.v2 : 0);
+        const listaCli = q => {
+          const t = T.norm(q);
+          return T.db.lista('clientes').filter(x => !t || T.norm(`${x.nombre} ${x.telefono || ''} ${x.documento || ''}`).includes(t))
+            .sort((a, b) => (b.saldo || 0) - (a.saldo || 0) || a.nombre.localeCompare(b.nombre, 'es')).slice(0, 6);
+        };
+        const pintarLista = q => {
+          const l = listaCli(q), caja = T.$('#fiar-lista', c);
+          if (caja) caja.innerHTML = l.length ? l.map(x => `<button data-fcli="${x.id}"><span>${T.esc(x.nombre)}<small>${T.esc([x.telefono, x.documento && 'C.C. ' + x.documento].filter(Boolean).join(' · ') || 'Sin datos de contacto')}</small></span>${x.saldo > 0 ? `<span class="etq aviso">Debe ${T.money(x.saldo)}</span>` : '<span class="etq ok">Al día</span>'}</button>`).join('')
+            : `<p class="suave">${q ? 'Ningún cliente con ese nombre. Créelo con el botón de abajo.' : 'Aún no hay clientes. Créelo con el botón de abajo.'}</p>`;
+        };
+        const pintarFiar = () => {
+          const fiado = fiadoDe(partes()), caja = T.$('#fiar', c), cli = clienteId && T.db.get('clientes', clienteId);
+          caja.classList.toggle('oculto', !fiado);
+          if (!fiado) return;
+          if (cli && !buscando) {
+            const queda = Math.max(0, (cli.cupo || 0) - (cli.saldo || 0)), pasa = (cli.saldo || 0) + fiado > (cli.cupo || 0);
+            caja.innerHTML = `<span class="fiar-tit">Se le fía a</span><div class="fiar-cli"><i class="avatar" style="--h:${T.tono(cli.nombre)}">${T.esc(T.iniciales(cli.nombre))}</i>
+              <div><b>${T.esc(cli.nombre)}</b><small>${cli.saldo > 0 ? `Debe ${T.money(cli.saldo)} · ` : 'Al día · '}puede fiar ${T.money(queda)} más</small></div><button class="btn mini" id="fiar-cambiar">Cambiar</button></div>
+              ${pasa && T.regla('respetarCupo') ? `<div class="banda aviso">${T.ico('alerta')}<span>Con esta venta quedaría debiendo ${T.money((cli.saldo || 0) + fiado)} y su cupo es ${T.money(cli.cupo)}. Necesita autorización.</span></div>` : ''}`;
+            return;
+          }
+          caja.innerHTML = `<span class="fiar-tit">¿A quién se le fía?</span>
+            <div class="buscador">${T.ico('buscar')}<input id="fiar-q" placeholder="Nombre, celular o cédula del cliente" autocomplete="off" aria-label="Buscar cliente"></div>
+            <div class="fiar-lista" id="fiar-lista"></div>
+            <div class="fila"><button class="btn mini" id="fiar-nuevo">${T.ico('mas')} Cliente nuevo</button>${cli ? '<button class="btn mini" id="fiar-volver">Dejar el que estaba</button>' : ''}</div>`;
+          const q = T.$('#fiar-q', c);
+          pintarLista('');
+          q.oninput = () => pintarLista(q.value);
+          q.onkeydown = e => {
+            if (e.key !== 'Enter') return;
+            e.preventDefault(); e.stopPropagation();
+            const l = listaCli(q.value); if (l[0]) elegirFiar(l[0].id);
+          };
+          setTimeout(() => q.focus(), 0);
+        };
+        const elegirFiar = id => { clienteId = id; buscando = false; guardar(); pintarCli(); pintarFiar(); ver(); };
         const ver = () => {
           const p = partes(), ef = (metodo === 'efectivo' ? p.v1 : 0) + (p.v2 && p.m2 === 'efectivo' ? p.v2 : 0);
           T.$('#ef', c).classList.toggle('oculto', !ef);
@@ -284,18 +324,24 @@
           caj.classList.toggle('falta', ef > 0 && rec < ef);
           caj.textContent = !ef ? `${T.METODOS[metodo]}: ${T.money(p.v1)}` : rec < ef ? `Faltan ${T.money(ef - rec)}` : `Cambio: ${T.money(rec - ef)}`;
         };
-        c.onclick = e => {
-          const bm = e.target.closest('[data-m]'), bb = e.target.closest('[data-b]');
-          if (bm) { metodo = bm.dataset.m; T.$$('[data-m]', c).forEach(x => x.classList.toggle('activo', x === bm)); }
+        c.onclick = async e => {
+          const bm = e.target.closest('[data-m]'), bb = e.target.closest('[data-b]'), bc = e.target.closest('[data-fcli]');
+          if (bm) { metodo = bm.dataset.m; T.$$('[data-m]', c).forEach(x => x.classList.toggle('activo', x === bm)); pintarFiar(); }
           if (bb) recibe.value = bb.dataset.b;
+          if (bc) return elegirFiar(bc.dataset.fcli);
+          if (e.target.closest('#fiar-cambiar')) { buscando = true; pintarFiar(); }
+          if (e.target.closest('#fiar-volver')) { buscando = false; pintarFiar(); }
+          if (e.target.closest('#fiar-nuevo')) { const n = await T.ui.editarCliente(); if (n) elegirFiar(n.id); return; }
           ver();
         };
-        c.oninput = ver;
+        c.oninput = e => { if (e.target.id === 'fiar-q') return; if (e.target.closest('#mix')) pintarFiar(); ver(); };
+        c.onchange = e => { if (e.target.id === 'mixto' || e.target.id === 'm2') { pintarFiar(); ver(); } };
         c.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); T.$('[data-id=ok]', m.el).click(); } };
-        ver();
+        ver(); pintarFiar();
 
         async function registrar() {
           const p = partes(), pagos = [{ metodo, monto: p.v1 }];
+          if (fiadoDe(p) > 0 && !(clienteId && T.db.get('clientes', clienteId))) { buscando = true; pintarFiar(); throw new Error('Elija a quién se le fía'); }
           if (p.v2) { if (p.m2 === metodo) throw new Error('Para pago mixto elija dos medios distintos'); pagos.push({ metodo: p.m2, monto: p.v2 }); }
           const ef = pagos.filter(x => x.metodo === 'efectivo').reduce((a, x) => a + x.monto, 0);
           const datos = { items: carrito, pagos, clienteId: clienteId || null, recibido: ef ? (recibe.value === '' ? ef : T.aNum(recibe.value)) : null, autoriza: autorizaDesc };

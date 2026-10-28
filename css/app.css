@@ -284,6 +284,19 @@ textarea { resize: vertical; }
 .gran-total span { font-size: .72rem; font-weight: 650; letter-spacing: .08em; text-transform: uppercase; }
 .gran-total b { font-size: 2.5rem; font-weight: 700; letter-spacing: -.035em; display: block; line-height: 1.1; font-variant-numeric: tabular-nums; }
 #recibe { min-height: 46px; font-size: 1.2rem; font-weight: 650; }
+/* Fiado: a quién se le fía, dentro de la ventana de cobro */
+.fiar { margin-top: 12px; padding: 12px; border: 1px solid var(--borde2); border-radius: var(--r); background: var(--panel2); display: grid; gap: 8px; }
+.fiar-tit { font-size: .74rem; font-weight: 650; text-transform: uppercase; letter-spacing: .06em; color: var(--suave); }
+.fiar-cli { display: flex; align-items: center; gap: 10px; }
+.fiar-cli > div { flex: 1; min-width: 0; line-height: 1.3; }
+.fiar-cli b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fiar-cli small { color: var(--suave); font-size: .82rem; }
+.fiar .banda { margin: 0; font-size: .85rem; }
+.fiar-lista { display: grid; gap: 2px; max-height: 214px; overflow-y: auto; border: 1px solid var(--borde); border-radius: var(--r2); background: var(--panel); padding: 3px; }
+.fiar-lista button { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 7px 9px; border: 0; border-radius: var(--r2); background: none; cursor: pointer; text-align: left; font-weight: 600; }
+.fiar-lista button:hover { background: var(--pri-suave); }
+.fiar-lista small { display: block; font-weight: 500; color: var(--suave); font-size: .78rem; }
+.fiar-lista p { padding: 8px; font-size: .86rem; }
 .cambio { text-align: center; font-size: 1.15rem; font-weight: 700; padding: 11px; border-radius: var(--r2); background: var(--ok-suave); color: var(--ok); margin-top: 12px; font-variant-numeric: tabular-nums; }
 .cambio.falta { background: var(--peligro-suave); color: var(--peligro); }
 

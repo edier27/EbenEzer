@@ -1,7 +1,8 @@
 {
-  "version": "1.4.0",
+  "version": "1.4.1",
   "fecha": "2026-10-28",
   "notas": [
+    "Al cobrar con Fiado se elige o se busca el cliente ahí mismo (por nombre, celular o cédula), o se crea uno nuevo.",
     "Factura con IA: tome la foto o elija el PDF de la factura electrónica; la IA lee proveedor, productos, cajas y pacas, costos e IVA, y se sube al inventario con un botón.",
     "La factura leída se puede ver en grande mientras se revisa, se marcan los renglones que no cuadran y se avisa si la misma factura ya se había subido.",
     "Informes en PDF o para imprimir: ventas, inventario valorizado, estado de cuenta de clientes, cartera y compras.",
