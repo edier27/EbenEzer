@@ -105,6 +105,8 @@
     appId: '1:1024846521688:web:1fc3a20f2a3e4ed0ebf12d'
   };
   const cfgNube = () => (D().loc('nube') || {}).config || NUBE_DEF;
+  const MSJ_NUBE = { 'auth/wrong-password': 'Clave incorrecta', 'auth/invalid-credential': 'Correo o clave de la nube incorrectos', 'auth/invalid-login-credentials': 'Correo o clave de la nube incorrectos', 'auth/user-not-found': 'No existe esa cuenta', 'auth/invalid-email': 'El correo no es válido', 'auth/email-already-in-use': 'Ese correo ya tiene cuenta: use "Entrar"', 'auth/weak-password': 'La clave debe tener mínimo 6 caracteres', 'auth/too-many-requests': 'Demasiados intentos. Espere unos minutos.', 'auth/network-request-failed': 'No hay internet' };
+  const errNube = e => new Error(MSJ_NUBE[e.code] || e.message);
   let fbCargando = null;
 
   function fbIniciar() {
@@ -215,9 +217,24 @@
       if (!correo || !clave) throw new Error('Escriba el correo y la clave');
       await fbIniciar();
       try { await (crear ? fb.auth().createUserWithEmailAndPassword(correo, clave) : fb.auth().signInWithEmailAndPassword(correo, clave)); }
-      catch (e) { throw new Error({ 'auth/wrong-password': 'Clave incorrecta', 'auth/invalid-credential': 'Correo o clave incorrectos', 'auth/user-not-found': 'No existe esa cuenta', 'auth/email-already-in-use': 'Ese correo ya tiene cuenta: use "Entrar"', 'auth/weak-password': 'La clave debe tener mínimo 6 caracteres' }[e.code] || e.message); }
+      catch (e) { throw errNube(e); }
       for (let i = 0; i < 30 && !fbUsuario; i++) await new Promise(r => setTimeout(r, 100));   // espera a que la sesión quede activa
       await T.registrar('nube.entrar', correo);
+    },
+    // Comprueba un correo y clave de la nube SIN tocar la sesión de este equipo. Devuelve el id de la cuenta.
+    async verificarNube(correo, clave) {
+      await fbIniciar();
+      const app = firebase.initializeApp(cfgNube(), 'verificar-' + Date.now());
+      try {
+        await app.auth().setPersistence(firebase.auth.Auth.Persistence.NONE);
+        return (await app.auth().signInWithEmailAndPassword(correo, clave)).user.uid;
+      } catch (e) { throw errNube(e); }
+      finally { app.auth().signOut().catch(() => { }); app.delete().catch(() => { }); }
+    },
+    // Firebase manda al correo un enlace para poner una clave nueva a la cuenta de la nube.
+    async recuperarClaveNube(correo) {
+      await fbIniciar();
+      try { await fb.auth().sendPasswordResetEmail(correo); } catch (e) { throw errNube(e); }
     },
     async salirNube() { if (fb) await fb.auth().signOut(); await T.registrar('nube.salir', ''); }
   };

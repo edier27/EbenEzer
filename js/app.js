@@ -113,13 +113,26 @@
         <h2>Iniciar turno</h2><p class="suave">Elija su usuario y escriba la clave.</p>
         <div class="usuarios-login">${us.map(u => `<button data-u="${u.id}" class="${u.id === sel ? 'activo' : ''}"><i class="avatar" style="--h:${T.tono(u.nombre)}">${T.esc(T.iniciales(u.nombre))}</i><span>${T.esc(u.nombre)}<small>${T.esc(T.roles()[u.rol].nombre)}</small></span></button>`).join('')}</div>
         <label class="campo"><span>Clave</span><input type="password" id="pin" autocomplete="off"></label>
-        <button class="btn pri grande" id="entrar" style="width:100%;margin-top:16px">Entrar</button>`);
+        <button class="btn pri grande" id="entrar" style="width:100%;margin-top:16px">Entrar</button>
+        <div class="enlaces"><button class="btn" id="olvide">${T.ico('reloj')} Olvidé mi clave</button><button class="btn" id="login-nube">${T.ico('nube')} Entrar con la nube</button></div>`);
       const pin = T.$('#pin');
+      let fallos = 0;
+      T.$('#olvide').onclick = async () => { if (await T.ui.recuperarClave(sel)) pin.focus(); };
+      // Trae usuarios y datos de la cuenta de la nube (o la crea) y vuelve a mostrar la lista de usuarios.
+      T.$('#login-nube').onclick = async () => {
+        if (T.sync.nube) return T.toast(`Este equipo ya está conectado a la nube (${T.sync.nube})`, 'ok');
+        if (!await T.ui.conectarNube()) return;
+        for (let i = 0; i < 20 && T.db.lista('usuarios').length === us.length; i++) await new Promise(r => setTimeout(r, 300));
+        this.login();
+      };
       T.$$('[data-u]').forEach(b => b.onclick = () => { sel = b.dataset.u; T.$$('[data-u]').forEach(x => x.classList.toggle('activo', x === b)); pin.focus(); });
       const entrar = async () => {
         if (!sel) return T.toast('Elija su usuario', 'error');
         try { await T.auth.iniciar(sel, pin.value); this.armar(); }
-        catch (e) { T.toast(e.message, 'error'); pin.value = ''; pin.focus(); }
+        catch (e) {
+          T.toast(e.message, 'error'); pin.value = ''; pin.focus();
+          if (++fallos >= 2) T.$('#olvide').classList.add('pri');   // se resalta la salida
+        }
       };
       T.$('#entrar').onclick = entrar;
       pin.onkeydown = e => { if (e.key === 'Enter') entrar(); };
@@ -287,6 +300,56 @@
   };
 
   T.ui = T.ui || {};
+
+  // ── Recuperar la clave de un usuario ──
+  // Se demuestra que es el dueño con el correo y la clave de la nube de ESTA tienda (la cuenta a la
+  // que está conectado este equipo). Sin nube no se puede: otro administrador la cambia en Usuarios.
+  T.ui.recuperarClave = async (usuarioId) => {
+    const nubeUid = T.db.loc('nubeUid'), us = T.db.lista('usuarios').filter(u => u.activo !== false).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+    if (!nubeUid) {
+      await T.modal({
+        titulo: 'Recuperar la clave', ancho: 460, botones: [{ txt: 'Entendido', cls: 'pri' }],
+        cuerpo: `<p class="texto">Este equipo no está conectado a la nube, así que la clave no se puede recuperar con el correo.</p>
+          <ul class="pasos" style="margin:0"><li>Si hay otro administrador, que entre y la cambie en <b>Configuración → Usuarios</b>.</li><li>Si la tienda ya se guardaba en la nube desde otro equipo, toque <b>Entrar con la nube</b> y luego vuelva aquí.</li></ul>`
+      });
+      return false;
+    }
+    return new Promise(res => {
+      const campos = [
+        { id: 'uid', label: 'Usuario', tipo: 'select', valor: usuarioId || (us[0] && us[0].id), opciones: us.map(u => [u.id, `${u.nombre} (${T.roles()[u.rol].nombre})`]) },
+        { id: 'correo', label: 'Correo de la nube', req: true, attrs: 'type="email" autocomplete="username"' }, { id: 'clave', label: 'Clave de la nube', tipo: 'password', req: true },
+        { id: 'nueva', label: 'Clave nueva para entrar (mínimo 4)', tipo: 'password', req: true, medio: true }, { id: 'otra', label: 'Repita la clave nueva', tipo: 'password', req: true, medio: true }
+      ];
+      const m = T.modal({
+        titulo: 'Recuperar la clave', ancho: 480, alCerrar: v => res(!!v),
+        cuerpo: `<p class="texto">Para poner una clave nueva, confirme con el <b>correo y la clave de la nube</b> de la tienda (los mismos con los que conectó la nube).</p>${T.form(campos)}
+          <p style="margin-top:10px"><a href="#" id="olvide-nube">¿Tampoco recuerda la clave de la nube?</a></p><div id="rc-estado"></div>`,
+        botones: [{ txt: 'Cancelar', cls: 'sec' }, {
+          txt: 'Cambiar la clave', cls: 'pri', fn: async cu => {
+            const v = T.leerForm(cu, campos), u = T.db.get('usuarios', v.uid);
+            if (!u) throw new Error('Elija el usuario');
+            if (v.nueva.length < 4) throw new Error('La clave nueva debe tener mínimo 4 caracteres');
+            if (v.nueva !== v.otra) throw new Error('Las claves nuevas no coinciden');
+            T.$('#rc-estado', cu).innerHTML = '<div class="pensando">Comprobando con la nube…</div>';
+            try {
+              if (await T.sync.verificarNube(v.correo, v.clave) !== nubeUid) throw new Error('Ese correo no es el de la nube de esta tienda');
+            } finally { T.$('#rc-estado', cu).innerHTML = ''; }
+            await T.auth.guardarUsuario({ ...u, pin: v.nueva });
+            await T.registrar('clave.recuperar', u.usuario, { con: 'cuenta de la nube', correo: v.correo });
+            T.toast(`Listo: ${u.nombre} ya puede entrar con la clave nueva`, 'ok');
+            return true;
+          }
+        }]
+      });
+      T.$('#olvide-nube', m.cuerpo).onclick = async e => {
+        e.preventDefault();
+        const correo = T.$('#f_correo', m.cuerpo).value.trim();
+        if (!/^\S+@\S+\.\S+$/.test(correo)) { T.$('#f_correo', m.cuerpo).focus(); return T.toast('Escriba primero el correo de la nube', 'error'); }
+        try { await T.sync.recuperarClaveNube(correo); T.toast(`Se envió a ${correo} un enlace para poner una clave nueva a la nube. Revise también el correo no deseado.`, 'ok'); }
+        catch (err) { T.toast(err.message, 'error'); }
+      };
+    });
+  };
 
   // ── Conectar este equipo a la nube (Firebase) ──
   // Todos los equipos de la tienda entran con el MISMO correo y clave: así comparten los datos.

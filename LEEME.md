@@ -61,6 +61,10 @@ no vender bajo el costo, descuento máximo sin autorización, cupo de fiado, red
 costo promedio, ganancia sugerida, días de aviso de vencimiento, cierre de sesión por inactividad,
 intentos de clave.
 
+**¿Olvidó la clave?** En la pantalla de entrada toque **Olvidé mi clave**: con el correo y la clave de la nube
+de la tienda se pone una clave nueva (queda anotado en la bitácora). Si tampoco recuerda la clave de la nube,
+ahí mismo se pide un enlace al correo. Sin nube conectada, la clave la cambia otro administrador en Configuración → Usuarios.
+
 **Permisos por cargo** (Administrador, Supervisor, Cajero, Bodeguero): tabla editable en la misma pantalla.
 Cuando un cajero necesita algo que no puede (anular, descuento alto, fiar sobre el cupo, cambiar un precio),
 el sistema pide la clave de un supervisor y deja anotado quién autorizó.
