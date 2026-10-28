@@ -6,7 +6,7 @@
 window.T = window.T || {};
 (function (T) {
   // Debe coincidir con version.json (ver README → "Cómo actualizar").
-  T.VERSION = '1.4.5';
+  T.VERSION = '1.5.0';
   T.vistas = {};
 
   T.$ = (s, el) => (el || document).querySelector(s);

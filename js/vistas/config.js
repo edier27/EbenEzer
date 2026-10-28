@@ -13,6 +13,39 @@
       T.$('#g', el).onclick = async () => { try { const v = T.leerForm(el, campos); v.anchoRecibo = Number(v.anchoRecibo); await T.db.setCfg('negocio', v); T.toast('Guardado', 'ok'); T.$('.marca b').textContent = v.nombre; } catch (e) { T.toast(e.message, 'error'); } };
     }],
 
+    licencia: ['Licencia', () => true, function pintar(el) {
+      const e = T.licencia.estado(), l = T.licencia.actual() || {}, puede = admin();
+      const campos = [
+        { id: 'codigo', label: 'Código de activación nuevo', req: true, ph: 'Ej: ANUAL-20271028ABC123-1A2B3C4D', attrs: 'autocapitalize="characters" spellcheck="false"' },
+        { id: 'correo', label: 'Correo de la tienda', req: true, medio: true, valor: l.correo || T.sync.nube || '', attrs: 'type="email" autocomplete="username"' },
+        { id: 'clave', label: 'Clave de la nube', tipo: 'password', req: true, medio: true, attrs: 'autocomplete="current-password"' }
+      ];
+      el.innerHTML = `<div class="rejilla dos">
+        <div class="tarjeta"><h4>Licencia de esta tienda <span class="etq ${e.activa ? (e.vence && e.dias <= 7 ? 'aviso' : 'ok') : 'mal'}">${e.activa ? 'Activa' : e.motivo === 'sin' ? 'Sin activar' : 'Vencida'}</span></h4>
+          <ul class="lista-simple">
+            <li><span>Tipo</span><b>${T.esc(e.nombre || '—')}</b></li>
+            <li><span>Vence</span><b>${e.activa && e.vence == null ? 'Nunca (permanente)' : e.vence ? T.fechaHora(e.vence) : '—'}</b></li>
+            ${e.activa && e.vence ? `<li><span>Le queda</span><b>${e.tipo === 'test' ? e.minutos + ' minuto(s)' : e.dias + ' día(s)'}</b></li>` : ''}
+            <li><span>Código</span><b class="num">${l.codigo ? T.esc(l.codigo.replace(/^(\w+-).+(-\w{4})\w{4}$/, '$1•••••$2••••')) : '—'}</b></li>
+            <li><span>Cuenta</span><b>${T.esc(l.correo || '—')}</b></li>
+            <li><span>Activada</span><b>${l.activada ? T.fechaHora(l.activada) : '—'}</b></li>
+          </ul></div>
+        <div class="tarjeta"><h4>${e.activa ? 'Renovar o cambiar de licencia' : 'Activar'}</h4>
+          ${puede ? `<p class="texto suave">Escriba el código que le entregó su proveedor. Al activarlo reemplaza al anterior y queda en todos los equipos de la tienda.</p>${T.form(campos)}<div id="lic-estado"></div><button class="btn pri" id="lic-activar" style="margin-top:14px">${T.ico('ok')} Activar código</button>`
+            : '<p class="texto suave">Solo un administrador puede activar o renovar la licencia.</p>'}</div></div>`;
+      const b = T.$('#lic-activar', el);
+      if (b) b.onclick = async () => {
+        const est = T.$('#lic-estado', el);
+        try {
+          const v = T.leerForm(el, campos);
+          b.disabled = true; est.innerHTML = '<div class="pensando">Verificando el código…</div>';
+          const lic = await T.licencia.activar(v.codigo, v.correo, v.clave, T.db.cfg('negocio', {}).nombre);
+          await T.licencia.guardar(lic);
+          T.toast(`Licencia activada: ${T.licencia.resumen()}`, 'ok'); pintar(el);
+        } catch (e) { T.toast(e.message, 'error'); est.innerHTML = ''; b.disabled = false; }
+      };
+    }],
+
     reglas: ['Reglas', admin, el => {
       const act = { ...T.REGLAS_DEF, ...T.db.cfg('reglas', {}) }, roles = T.roles();
       const campos = Object.entries(T.REGLAS_INFO).map(([id, [tipo, label, ayuda]]) => ({ id, tipo, label, ayuda, valor: act[id], medio: tipo === 'number' }));

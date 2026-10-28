@@ -20,7 +20,7 @@
   const portada = (titulo, sub, cuerpo) => `<div class="portada">
       <aside class="portada-marca"><div>${T.marca()}<h1>${T.esc(titulo)}</h1><p>${T.esc(sub)}</p></div>
         <ul><li>${T.ico('vender')} Ventas, caja y fiados</li><li>${T.ico('inventario')} Inventario con kárdex</li><li>${T.ico('auditoria')} Todo queda registrado</li></ul>
-        <footer>Versión ${T.VERSION}</footer></aside>
+        <footer>Versión ${T.VERSION}${T.licencia && T.db.lista('usuarios').length ? ' · ' + T.esc(T.licencia.resumen()) : ''}</footer></aside>
       <main class="portada-form"><div class="portada-caja">${cuerpo}</div></main></div>`;
 
   // Cambios de datos entre versiones. Para una versión nueva que necesite
@@ -52,6 +52,7 @@
 
     entrada() {
       if (!T.db.lista('usuarios').length) return this.instalar();
+      if (!T.licencia.estado().activa) return this.activar();
       if (T.auth.reanudar()) return this.armar();
       this.login();
     },
@@ -64,23 +65,39 @@
         { id: 'direccion', label: 'Dirección' },
         { id: 'nombre', label: 'Su nombre (administrador)', req: true },
         { id: 'usuario', label: 'Usuario', req: true, medio: true, valor: 'admin' },
-        { id: 'pin', label: 'Clave (mínimo 4)', tipo: 'password', req: true, medio: true }
+        { id: 'pin', label: 'Clave para entrar (mínimo 4)', tipo: 'password', req: true, medio: true }
+      ];
+      const camposLic = [
+        { id: 'codigo', label: 'Código de activación', req: true, ph: 'Ej: ANUAL-20271028ABC123-1A2B3C4D', attrs: 'autocapitalize="characters" spellcheck="false"' },
+        { id: 'correo', label: 'Correo de la tienda', req: true, attrs: 'type="email" autocomplete="username"', ph: 'correo@gmail.com' },
+        { id: 'clave', label: 'Clave de la nube (mínimo 6)', tipo: 'password', req: true, attrs: 'autocomplete="new-password"' }
       ];
       raiz().innerHTML = portada('Punto de venta', 'Configure la tienda en un minuto y empiece a vender.', `
         <h2>Crear la tienda</h2><p class="suave">Estos datos salen en los recibos y se pueden cambiar después.</p>
         ${T.form(campos)}
-        <button class="btn pri grande" id="crear" style="width:100%;margin-top:18px">Crear la tienda</button>
+        <h3 class="sub-portada">${T.ico('auditoria')} Activación y nube</h3>
+        <p class="suave" style="margin-bottom:12px;font-size:.88rem">El código se lo entrega su proveedor. Con el correo y la clave quedan la licencia y todos los datos guardados en la nube; use los mismos en los demás equipos.</p>
+        ${T.form(camposLic)}
+        <div id="crear-estado"></div>
+        <button class="btn pri grande" id="crear" style="width:100%;margin-top:18px">Activar y crear la tienda</button>
         <div class="enlaces"><button class="btn" id="de-nube">${T.ico('nube')} Ya tengo la tienda en la nube</button><button class="btn" id="restaurar">${T.ico('subir')} Tengo un respaldo</button></div>`);
       T.$('#crear').onclick = async () => {
+        const btn = T.$('#crear'), est = T.$('#crear-estado');
         try {
-          const v = T.leerForm(raiz(), campos);
+          const v = T.leerForm(raiz(), campos), a = T.leerForm(raiz(), camposLic);
+          if (String(v.pin).length < 4) throw new Error('La clave para entrar debe tener mínimo 4 caracteres');
+          btn.disabled = true; est.innerHTML = '<div class="pensando">Verificando el código de activación…</div>';
+          const lic = await T.licencia.activar(a.codigo, a.correo, a.clave, v.negocio);
+          await T.licencia.guardar(lic);
           await T.db.lote([{ s: 'config', r: { id: 'negocio', valor: { nombre: v.negocio, nit: v.nit, telefono: v.telefono, direccion: v.direccion, pie: '¡Gracias por su compra!', anchoRecibo: 80 } } }], { remoto: false });
           const u = await T.auth.guardarUsuario({ nombre: v.nombre, usuario: v.usuario, pin: v.pin, rol: 'admin' });
           await T.auth.iniciar(u.id, v.pin);
           await T.registrar('tienda.crear', v.negocio);
           this.armar();
-          T.ui.conectarNube({ primera: true });
-        } catch (e) { T.toast(e.message, 'error'); }
+          T.toast(`Tienda activada: ${T.licencia.resumen()}`, 'ok');
+          // Con el mismo correo y clave se conecta la nube: desde ya todo queda en Firebase.
+          T.sync.entrarONueva(a.correo, a.clave).catch(e => { T.toast('La tienda quedó creada, pero falta conectar la nube: ' + e.message, 'error'); T.ui.conectarNube({ primera: true }); });
+        } catch (e) { T.toast(e.message, 'error'); est.innerHTML = ''; btn.disabled = false; }
       };
       // Equipo nuevo (celular, otro computador): trae usuarios, inventario y ventas de la cuenta de la nube.
       T.$('#de-nube').onclick = async () => {
@@ -103,6 +120,45 @@
           location.reload();
         } catch (e) { T.toast(e.message, 'error'); }
       };
+    },
+
+    // ── Activar (sin licencia o licencia vencida). Los datos no se tocan: solo se pide un código nuevo. ──
+    activar() {
+      const e = T.licencia.estado(), l = T.licencia.actual() || {};
+      const campos = [
+        { id: 'codigo', label: 'Código de activación', req: true, ph: 'Ej: ANUAL-20271028ABC123-1A2B3C4D', attrs: 'autocapitalize="characters" spellcheck="false"' },
+        { id: 'correo', label: 'Correo de la tienda', req: true, valor: l.correo || T.sync.nube || '', attrs: 'type="email" autocomplete="username"' },
+        { id: 'clave', label: 'Clave de la nube', tipo: 'password', req: true, attrs: 'autocomplete="current-password"' }
+      ];
+      raiz().innerHTML = portada(negocio().nombre || 'Tienda', 'Punto de venta', `
+        <h2>${e.motivo === 'sin' ? 'Active la tienda' : 'La licencia venció'}</h2>
+        <p class="suave">${e.motivo === 'sin' ? 'Para usar el programa escriba el código de activación que le entregó su proveedor.' : `La licencia ${T.esc(e.nombre || '')}${e.vence ? ' venció el ' + T.fecha(e.vence) : ' ya no es válida'}. Sus datos están guardados: escriba un código nuevo para seguir.`}</p>
+        <div style="margin-top:16px">${T.form(campos)}</div>
+        <p class="suave" style="margin-top:8px;font-size:.86rem">Use el correo y la clave de la nube de la tienda. Si es la primera vez, se crea la cuenta con esos datos.</p>
+        <div id="act-estado"></div>
+        <button class="btn pri grande" id="activar" style="width:100%;margin-top:16px">${T.ico('ok')} Activar</button>
+        <div class="enlaces"><button class="btn" id="act-nube">${T.ico('nube')} Ya la activé en otro equipo</button></div>`);
+      const btn = T.$('#activar'), est = T.$('#act-estado');
+      const ir = async () => {
+        try {
+          const v = T.leerForm(raiz(), campos);
+          btn.disabled = true; est.innerHTML = '<div class="pensando">Verificando el código…</div>';
+          const lic = await T.licencia.activar(v.codigo, v.correo, v.clave, negocio().nombre);
+          await T.licencia.guardar(lic);
+          T.toast(`Tienda activada: ${T.licencia.resumen()}`, 'ok');
+          if (!T.sync.nube) T.sync.entrarONueva(v.correo, v.clave).catch(() => { });
+          this.entrada();
+        } catch (err) { T.toast(err.message, 'error'); est.innerHTML = ''; btn.disabled = false; }
+      };
+      btn.onclick = ir;
+      T.$('#f_clave').onkeydown = ev => { if (ev.key === 'Enter') ir(); };
+      // La licencia viaja con la nube: al conectar este equipo llega la que se activó en otro.
+      T.$('#act-nube').onclick = async () => {
+        if (!T.sync.nube && !await T.ui.conectarNube()) return;
+        for (let i = 0; i < 20 && !T.licencia.estado().activa; i++) await new Promise(r => setTimeout(r, 400));
+        if (T.licencia.estado().activa) this.entrada(); else T.toast('En la nube tampoco hay una licencia activa. Escriba un código.', 'error');
+      };
+      T.$('#f_codigo').focus();
     },
 
     // ── Entrada ──
@@ -198,6 +254,7 @@
 
     async navegar() {
       if (!T.auth.usuario || !T.$('#principal')) return;
+      if (!T.licencia.estado().activa) return this.activar();
       let id = location.hash.slice(1) || 'inicio';
       const item = MENU.find(m => m[0] === id);
       if (!item || !T.vistas[id] || !T.$(`#nav [data-v="${id}"]`)) id = 'inicio';
@@ -254,6 +311,8 @@
   // Cierre de sesión por inactividad (regla "bloqueoMin").
   let ultimoUso = Date.now();
   ['pointerdown', 'keydown'].forEach(ev => document.addEventListener(ev, () => { ultimoUso = Date.now(); }, true));
+  // La licencia se revisa cada minuto (las de prueba vencen en minutos).
+  setInterval(() => { if (T.auth.usuario && T.licencia && !T.licencia.estado().activa && T.$('#principal')) { T.$$('.modal-fondo').forEach(m => m.remove()); T.app.activar(); } }, 60000);
   setInterval(async () => {
     const min = T.auth.usuario ? T.regla('bloqueoMin') : 0;
     if (min > 0 && Date.now() - ultimoUso > min * 60000) { T.$$('.modal-fondo').forEach(m => m.remove()); await T.auth.salir(); T.app.login(); }
@@ -274,6 +333,7 @@
           <div class="fila">${T.auth.puede('ventas.crear') ? `<a class="btn pri" href="#vender">${T.ico('vender')} Vender</a>` : ''}${T.auth.puede('compras.crear') && T.auth.puede('ia.usar') ? `<button class="btn ia" id="factura">${T.ico('factura')} Factura con IA</button>` : ''}${T.auth.puede('inventario.editar') && T.auth.puede('ia.usar') ? `<button class="btn" id="foto">${T.ico('camara')} Foto al inventario</button>` : ''}</div></div>
         ${location.protocol === 'file:' ? `<div class="banda peligro">${T.ico('alerta')}<span>Abrió el programa como archivo (${T.esc(decodeURIComponent(location.pathname).replace(/^\//, ''))}). Así los datos quedan aparte, solo en esta ventana. Ábralo con <b>Iniciar Tienda.bat</b> o en <b>ebenezer-fiados.web.app</b>.</span></div>` : ''}
         ${T.sync.nubeRevisada && !T.sync.nube ? `<div class="banda peligro">${T.ico('nube')}<span>${T.sync.nubePerdida ? 'Se cerró la sesión de la nube en este equipo.' : 'Los datos NO se están guardando en Firebase.'} Si se daña el equipo o se borra el navegador, se pierden. ${T.auth.puede('respaldo.gestionar') ? '' : 'Pídale al administrador que conecte la nube.'}</span>${T.auth.puede('respaldo.gestionar') ? '<button class="btn pri" id="nube">Conectar la nube</button>' : ''}</div>` : ''}
+        ${(() => { const l = T.licencia.estado(); return l.activa && l.vence && (l.tipo === 'test' || l.dias <= 7) ? `<div class="banda aviso">${T.ico('reloj')}<span>La licencia ${T.esc(l.nombre)} vence ${l.tipo === 'test' ? `en ${l.minutos} min` : l.dias <= 1 ? 'hoy' : `en ${l.dias} días`}. Pida un código nuevo a su proveedor.</span>${T.auth.puede('config.editar') ? '<a class="btn" href="#config" id="ir-lic">Renovar</a>' : ''}</div>` : ''; })()}
         ${!caja && T.auth.puede('caja.operar') ? `<div class="banda">${T.ico('caja')}<span>La caja está cerrada.</span><a class="btn" href="#caja">Abrir caja</a></div>` : ''}
         ${verPlata ? `<div class="rejilla">
           <div class="tarjeta kpi principal"><h4>Ventas de hoy</h4><b>${T.money(d.recibido)}</b><small>${cambio === null ? '' : `<span class="delta ${cambio < 0 ? 'baja' : ''}">${cambio > 0 ? '+' : ''}${cambio}% vs. ayer</span>`}Contado ${T.money(d.contado)} + abonos ${T.money(d.abonos)}</small></div>
@@ -294,6 +354,7 @@
       if (foto) foto.onclick = () => T.ui.fotoIA('productos');
       if (fac) fac.onclick = () => T.ui.facturaIA();
       if (resp) resp.onclick = async () => { await T.respaldo.descargar(); T.app.refrescar(); };
+      const irLic = T.$('#ir-lic', el); if (irLic) irLic.onclick = () => { T.vistas.config.pestana = 'licencia'; };
       const nube = T.$('#nube', el);
       if (nube) nube.onclick = () => T.ui.conectarNube();
     }

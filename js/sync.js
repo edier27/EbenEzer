@@ -106,7 +106,7 @@
   };
   const cfgNube = () => (D().loc('nube') || {}).config || NUBE_DEF;
   const MSJ_NUBE = { 'auth/wrong-password': 'Clave incorrecta', 'auth/invalid-credential': 'Correo o clave de la nube incorrectos', 'auth/invalid-login-credentials': 'Correo o clave de la nube incorrectos', 'auth/user-not-found': 'No existe esa cuenta', 'auth/invalid-email': 'El correo no es válido', 'auth/email-already-in-use': 'Ese correo ya tiene cuenta: use "Entrar"', 'auth/weak-password': 'La clave debe tener mínimo 6 caracteres', 'auth/too-many-requests': 'Demasiados intentos. Espere unos minutos.', 'auth/network-request-failed': 'No hay internet' };
-  const errNube = e => new Error(MSJ_NUBE[e.code] || e.message);
+  const errNube = e => Object.assign(new Error(MSJ_NUBE[e.code] || e.message), { code: e.code });
   let fbCargando = null;
 
   function fbIniciar() {
@@ -162,6 +162,12 @@
     get nube() { return fbUsuario ? fbUsuario.email : null; },
     get proyectoNube() { return cfgNube().projectId; },
     get ultimaNube() { return ultNube; },
+    cargarFirebase: () => fbIniciar(),
+    // Primera vez: crea la cuenta de la nube; si ya existe, entra con ella.
+    async entrarONueva(correo, clave) {
+      try { await this.entrarNube(correo, clave, true); }
+      catch (e) { if (e.code !== 'auth/email-already-in-use') throw e; await this.entrarNube(correo, clave, false); }
+    },
     // Ya se sabe si este equipo tiene la sesión de la nube abierta (Firebase tarda un momento en cargar).
     get nubeRevisada() { return fbListo; },
     // Equipo que ya estuvo conectado a la nube pero ahora no tiene la sesión abierta.

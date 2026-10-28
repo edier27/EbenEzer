@@ -15,7 +15,19 @@ Solo necesita tener instalado Node.js (ya lo tiene).
 `http://192.168.x.x:8080` y una **clave**. Abra esa dirección en el celular y escriba la clave una sola vez.
 Queda con el mismo inventario, ventas y usuarios.
 
-La primera vez pide el nombre de la tienda y crea el usuario administrador.
+La primera vez pide el nombre de la tienda, crea el usuario administrador y pide el **código de activación**
+junto con el correo y la clave de la nube de la tienda.
+
+### Licencia (código de activación)
+
+Los códigos se sacan en la **Consola de licencias** de Global ACCE (`Documents\software\panel-admin.html`),
+sección **Eben-ezer**: Demo (8 días), Trial (30 días), Anual (365 días), PRO (permanente) o Test (10 minutos).
+Cada código sirve una sola vez y queda a nombre de la cuenta (correo) que lo activó.
+
+- **Al crear la tienda:** se escribe el código, el correo y la clave. Con eso se activa y se conecta la nube.
+- **Configuración → Licencia:** muestra el tipo, cuándo vence y cuántos días quedan; ahí se escribe un código nuevo para renovar.
+- **Cuando vence:** el programa muestra "La licencia venció" y pide un código nuevo. Los datos no se tocan.
+- Faltando 7 días, Inicio avisa. La licencia viaja con la nube: los demás equipos de la tienda quedan activados solos.
 
 > Si Windows pregunta por el firewall al iniciar, permita el acceso en "Redes privadas"
 > (solo hace falta para que los celulares entren).

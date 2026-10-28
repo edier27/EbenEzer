@@ -202,6 +202,7 @@ textarea { resize: vertical; }
 .portada-caja h2 { font-size: 1.5rem; margin-bottom: 4px; }
 .portada-caja > .suave { margin-bottom: 20px; }
 .portada.solo { grid-template-columns: 1fr; }
+.sub-portada { display: flex; align-items: center; gap: 8px; margin: 22px 0 4px; padding-top: 16px; border-top: 1px solid var(--borde); color: var(--marca-texto); }
 .usuarios-login { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; margin: 0 0 18px; }
 .usuarios-login button { display: flex; align-items: center; gap: 11px; padding: 10px 12px; border: 1px solid var(--borde2); border-radius: var(--r); background: var(--panel); cursor: pointer; text-align: left; font-weight: 600; line-height: 1.25; }
 .usuarios-login button:hover { border-color: var(--tenue); }
