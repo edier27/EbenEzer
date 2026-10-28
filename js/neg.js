@@ -210,17 +210,20 @@
       }
       prods.forEach(p => ops.push({ s: 'productos', r: p }));
       const efectivo = o.pagos.filter(x => x.metodo === 'efectivo').reduce((a, x) => a + x.monto, 0);
-      // Si la venta es de un turno ya cerrado, el efectivo devuelto sale de la caja actual.
+      // Si la venta es de otro turno (ya cerrado o de otro equipo), el efectivo devuelto sale de la caja
+      // actual; la caja original la sigue contando como recibida (ver resumenCaja).
+      let cajaDevolucion = null;
       if (efectivo > 0 && (!caja || caja.id !== o.cajaId)) {
         if (!caja) throw new Error('Abra la caja para devolver el efectivo de esta venta');
         await this.exigirEfectivo(caja, efectivo);
         ops.push({ s: 'cajaMovs', r: { id: T.uid(), fecha: Date.now(), cajaId: caja.id, tipo: 'devolucion', concepto: `Anulación ${o.numero}`, monto: efectivo, ...quien() } });
+        cajaDevolucion = caja.id;
       }
       if (o.fiado > 0 && o.clienteId) {
         const c = { ...D().get('clientes', o.clienteId) };
         c.saldo = (c.saldo || 0) - o.fiado; ops.push({ s: 'clientes', r: c });
       }
-      const v = { ...o, estado: 'anulada', anulacion: { fecha: Date.now(), usuario: T.auth.usuario.nombre, autoriza: autoriza || '', motivo } };
+      const v = { ...o, estado: 'anulada', anulacion: { fecha: Date.now(), usuario: T.auth.usuario.nombre, autoriza: autoriza || '', motivo, cajaDevolucion } };
       ops.push({ s: 'ventas', r: v }, T.aud('venta.anular', o.numero, { total: o.total, motivo, autoriza: autoriza || '' }));
       await D().lote(ops);
       return v;
@@ -321,6 +324,7 @@
     async pagarCompra(id, monto, deCaja) {
       T.auth.exigir('compras.crear');
       const o = await D().leer('compras', id);
+      if (!o) throw new Error('La compra no existe');
       if (!(monto > 0) || monto > o.saldo) throw new Error('El pago debe ser mayor que cero y no superar lo que se debe');
       const caja = deCaja ? this.cajaAbierta() : null;
       if (deCaja && !caja) throw new Error('Para pagar con la caja primero debe abrirla');
@@ -353,7 +357,9 @@
     },
     async abono({ clienteId, monto, metodo, nota }) {
       T.auth.exigir('abonos.crear');
-      const caja = this.exigirCaja(), c = { ...D().get('clientes', clienteId) };
+      const caja = this.exigirCaja(), o = D().get('clientes', clienteId);
+      if (!o) throw new Error('El cliente no existe');
+      const c = { ...o };
       monto = T.red(monto);
       if (!(monto > 0)) throw new Error('El abono debe ser mayor que cero');
       if (monto > (c.saldo || 0)) throw new Error(`${c.nombre} solo debe ${T.money(c.saldo)}`);
@@ -388,13 +394,19 @@
       const [ventas, abonos, movs] = await Promise.all([D().porIndice('ventas', 'cajaId', caja.id), D().porIndice('abonos', 'cajaId', caja.id), D().porIndice('cajaMovs', 'cajaId', caja.id)]);
       const r = { ventas: 0, anuladas: 0, total: 0, costo: 0, porMetodo: {}, abonos: 0, abonosPorMetodo: {}, ingreso: 0, gasto: 0, retiro: 0, devolucion: 0, compra: 0, movs: movs.sort((a, b) => a.fecha - b.fecha) };
       for (const v of ventas) {
-        if (v.estado !== 'completada') { r.anuladas++; continue; }
+        if (v.estado !== 'completada') {
+          r.anuladas++;
+          // Anulada en otra caja: el efectivo sí entró a esta y salió de aquella.
+          const ef = v.anulacion && v.anulacion.cajaDevolucion && v.anulacion.cajaDevolucion !== caja.id ? v.pagos.filter(p => p.metodo === 'efectivo').reduce((a, p) => a + p.monto, 0) : 0;
+          if (ef) r.efectivoAnuladas = (r.efectivoAnuladas || 0) + ef;
+          continue;
+        }
         r.ventas++; r.total += v.total; r.costo += v.costo || 0;
         v.pagos.forEach(p => { r.porMetodo[p.metodo] = (r.porMetodo[p.metodo] || 0) + p.monto; });
       }
       abonos.forEach(a => { r.abonos += a.monto; r.abonosPorMetodo[a.metodo] = (r.abonosPorMetodo[a.metodo] || 0) + a.monto; });
       movs.forEach(m => { r[m.tipo] = (r[m.tipo] || 0) + m.monto; });
-      r.esperado = caja.base + (r.porMetodo.efectivo || 0) + (r.abonosPorMetodo.efectivo || 0) + r.ingreso - r.gasto - r.retiro - r.devolucion - r.compra;
+      r.esperado = caja.base + (r.porMetodo.efectivo || 0) + (r.efectivoAnuladas || 0) + (r.abonosPorMetodo.efectivo || 0) + r.ingreso - r.gasto - r.retiro - r.devolucion - r.compra;
       return r;
     },
     async cerrarCaja(contado, nota) {
@@ -466,7 +478,7 @@
     async resumen(desde, hasta) {
       const [ventas, movs, abonos] = await Promise.all([D().rango('ventas', 'fecha', desde, hasta), D().rango('cajaMovs', 'fecha', desde, hasta), D().rango('abonos', 'fecha', desde, hasta)]);
       // Todas las cifras van netas de devoluciones. Las cantidades por producto van en unidades sueltas.
-      const r = { ventas: [], n: 0, anuladas: 0, total: 0, costo: 0, descuento: 0, impuesto: 0, fiado: 0, devuelto: 0, gastos: 0, abonos: 0, porMetodo: {}, porDia: {}, porCategoria: {}, porUsuario: {}, productos: {} };
+      const r = { ventas: [], n: 0, anuladas: 0, total: 0, costo: 0, descuento: 0, impuesto: 0, fiado: 0, devuelto: 0, gastos: 0, abonos: 0, porMetodo: {}, porDia: {}, porDiaN: {}, porCategoria: {}, porUsuario: {}, productos: {} };
       for (const v of ventas) {
         r.ventas.push(v);
         if (v.estado !== 'completada') { r.anuladas++; continue; }
@@ -475,7 +487,7 @@
         v.pagos.forEach(p => { r.porMetodo[p.metodo] = (r.porMetodo[p.metodo] || 0) + p.monto; });
         if (fd) r.porMetodo.fiado -= fd;
         if (dv - fd) r.porMetodo.efectivo = (r.porMetodo.efectivo || 0) - (dv - fd);   // lo devuelto en plata sale del efectivo
-        const d = T.dia(v.fecha); r.porDia[d] = (r.porDia[d] || 0) + neto;
+        const d = T.dia(v.fecha); r.porDia[d] = (r.porDia[d] || 0) + neto; r.porDiaN[d] = (r.porDiaN[d] || 0) + 1;
         r.porUsuario[v.usuario] = (r.porUsuario[v.usuario] || 0) + neto;
         for (const l of v.items) {
           const queda = T.r3(l.cantidad - (l.devuelto || 0));

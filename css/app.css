@@ -121,7 +121,9 @@ textarea { resize: vertical; }
 .cabeza .suave { font-size: .9rem; }
 .banda { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 9px 14px; border-radius: var(--r); margin-bottom: 14px; background: var(--info-suave); color: var(--info); font-weight: 600; font-size: .92rem; }
 .banda.aviso { background: var(--aviso-suave); color: var(--aviso); }
+.banda > span { flex: 1 1 240px; }
 .banda .btn { margin-left: auto; }
+.banda .btn + .btn-ico, .banda .btn + .btn { margin-left: 0; }
 
 /* ── Tarjetas ── */
 .tarjeta { background: var(--panel); border: 1px solid var(--borde); border-radius: var(--r); padding: 16px 18px; }
@@ -287,7 +289,37 @@ textarea { resize: vertical; }
 
 /* ── IA ── */
 .fotos-ia { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0; }
-.fotos-ia img { width: 88px; height: 88px; object-fit: cover; border-radius: var(--r2); border: 1px solid var(--borde); }
+.fotos-ia:empty { display: none; }
+.fotos-ia figure { position: relative; margin: 0; }
+.fotos-ia img, .fotos-ia .pdf-mini { width: 88px; height: 88px; object-fit: cover; border-radius: var(--r2); border: 1px solid var(--borde); }
+.fotos-ia figure .btn-ico { position: absolute; top: 3px; right: 3px; width: 24px; height: 24px; background: rgba(12, 18, 29, .7); color: #fff; border-radius: 50%; }
+.fotos-ia figure .btn-ico .ico { width: 14px; height: 14px; }
+.pdf-mini { display: grid; place-items: center; align-content: center; gap: 2px; background: var(--peligro-suave); color: var(--peligro); font-size: .72rem; font-weight: 700; letter-spacing: .05em; }
+.pdf-mini .ico { width: 26px; height: 26px; }
+.pasos { margin: 14px 0 0; padding-left: 22px; color: var(--suave); display: grid; gap: 4px; font-size: .92rem; }
+.pasos li::marker { color: var(--pri); font-weight: 700; }
+/* Entrada de mercancía y revisión de factura */
+.form-3 { grid-template-columns: 1.4fr 1fr 1.4fr; }
+.doc-tira { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 12px; margin-bottom: 12px; border: 1px solid var(--borde); border-radius: var(--r); background: var(--panel2); }
+.doc-tira button { padding: 0; border: 1px solid var(--borde2); border-radius: var(--r2); background: var(--panel); cursor: zoom-in; overflow: hidden; line-height: 0; }
+.doc-tira button:hover { border-color: var(--pri); }
+.doc-tira img, .doc-tira .pdf-mini { width: 64px; height: 84px; object-fit: cover; object-position: top; line-height: 1.2; }
+.doc-tira p { flex: 1 1 220px; font-size: .86rem; }
+.modal-doc .modal-cuerpo { padding: 0; background: var(--panel2); }
+.doc-grande { display: block; width: 100%; height: calc(100dvh - 120px); border: 0; object-fit: contain; background: #fff; }
+img.doc-grande { height: auto; min-height: 0; max-height: none; }
+.tabla-entrada td { vertical-align: top; }
+.tabla-entrada tr.revisar td { background: color-mix(in srgb, var(--aviso-suave) 55%, transparent); }
+.ent-etqs { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.ent-etqs:empty { display: none; }
+.ent-etqs .etq { display: inline-flex; align-items: center; gap: 4px; white-space: normal; }
+.ent-etqs .ico { width: 13px; height: 13px; }
+.ent-resumen { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px; margin-top: 12px; padding: 12px 14px; border-radius: var(--r); background: var(--panel2); border: 1px solid var(--borde); font-size: .92rem; }
+.ent-resumen:empty { display: none; }
+.ent-resumen .crece { flex: 1; }
+.ent-resumen .etq { display: inline-flex; align-items: center; gap: 5px; font-size: .82rem; }
+.ent-resumen .etq .ico { width: 14px; height: 14px; }
+.banda + .banda { margin-top: -6px; }
 .pensando { display: flex; align-items: center; gap: 10px; padding: 14px 0; color: var(--suave); }
 .pensando::before { content: ""; width: 18px; height: 18px; border-radius: 50%; border: 2.5px solid var(--borde); border-top-color: var(--pri); animation: gira .8s linear infinite; }
 @keyframes gira { to { rotate: 360deg; } }
@@ -320,7 +352,8 @@ textarea { resize: vertical; }
   #nav a { height: 44px; border-bottom: 0; border-left: 3px solid transparent; border-radius: 0 var(--r2) var(--r2) 0; }
   #nav a.activo { border-left-color: var(--rojo); background: var(--pri-suave); }
   #app.menu-abierto #nav { translate: 0 0; }
-  #app.menu-abierto::after { content: ""; position: fixed; inset: 0; background: rgba(0, 0, 0, .45); z-index: 45; }
+  /* La capa oscura va por debajo de la cabecera (z-index 40): el menú vive dentro de ella y debe quedar encima. */
+  #app.menu-abierto::after { content: ""; position: fixed; inset: 0; background: rgba(0, 0, 0, .45); z-index: 39; }
   #principal { padding: 16px 16px 90px; }
   .pos { grid-template-columns: minmax(0, 1fr); }
   .tiquete { position: static; height: auto; min-height: 0; }
@@ -328,7 +361,7 @@ textarea { resize: vertical; }
   .tiquete { scroll-margin-top: calc(var(--barra) + 8px); }
   .pos-flota { display: flex; align-items: center; justify-content: space-between; gap: 12px; position: fixed; left: 12px; right: 12px; bottom: 12px; z-index: 20; min-height: 52px; padding: 0 16px; border: 0; border-radius: var(--r); background: var(--marca); color: #fff; font-weight: 600; box-shadow: var(--sombra); cursor: pointer; }
   .pos-flota b { font-size: 1.15rem; }
-  .form { grid-template-columns: 1fr; } .campo.medio { grid-column: 1 / -1; }
+  .form, .form-3 { grid-template-columns: 1fr; } .campo.medio { grid-column: 1 / -1; }
   .prods { grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); }
   .portada { grid-template-columns: 1fr; }
   .portada-marca { padding: 22px 20px; flex-direction: row; align-items: center; justify-content: flex-start; gap: 14px; }
@@ -337,16 +370,84 @@ textarea { resize: vertical; }
   .portada-marca > div > svg { width: 36px; height: 36px; }
   .portada-form { place-items: start center; padding: 24px 16px 40px; }
 }
+.solo-movil { display: none !important; }
+.cargando { justify-content: center; padding: 48px 0; }
 @media (max-width: 560px) {
+  #nav .solo-movil { display: flex !important; margin-top: auto; border-top: 1px solid var(--borde); }
+  .quien #salir { display: none; }
+  .cab-sup { gap: 6px; padding: 0 8px; }
+  .cab-der { gap: 6px; }
+  .quien { padding-left: 6px; margin-left: 0; }
+  .prod-img { aspect-ratio: 2 / 1; }
+  /* Tablas como tarjetas: cada dato con su título, sin deslizar de lado */
+  .tabla-movil thead { display: none; }
+  .tabla-movil, .tabla-movil tbody, .tabla-movil tr { display: block; width: 100%; }
+  .tabla-movil tr { display: flow-root; padding: 10px 14px; border-top: 1px solid var(--borde); }
+  .tabla-movil tbody tr:first-child { border-top: 0; }
+  .tabla-movil tbody tr:hover td { background: none; }
+  .tabla-movil td { display: block; overflow: hidden; padding: 3px 0; border: 0; text-align: right; }
+  .tabla-movil td:empty { display: none; }
+  .tabla-movil td::before { content: attr(data-t); float: left; margin-right: 14px; color: var(--suave); font-size: .72rem; font-weight: 650; text-transform: uppercase; letter-spacing: .05em; line-height: 1.9; }
+  /* La primera columna (producto, cliente, recibo…) es el título de la tarjeta */
+  .tabla-movil td:first-child, .tabla-movil td[data-t=""]:first-child + td { text-align: left; padding-bottom: 6px; }
+  .tabla-movil td:first-child::before, .tabla-movil td[data-t=""]:first-child + td::before, .tabla-movil td[data-t=""]::before { content: none; }
+  .tabla-movil td[data-t=""]:first-child { float: left; padding: 2px 10px 0 0; }
+  .tabla-movil td.acc { display: flex; justify-content: flex-end; align-items: center; gap: 6px; padding-top: 8px; }
   #chip-caja { font-size: 0; gap: 0; padding: 0 9px; }
   #chip-caja .punto { width: 10px; height: 10px; }
   .cabeza h2 { font-size: 1.2rem; }
 }
 
-/* ── Impresión: solo el recibo o reporte ── */
+/* ── Informes en hoja carta / A4 (imprimir o guardar en PDF) ── */
+.informe { page: informe; color: #111; background: #fff; font: 10pt/1.4 "Segoe UI", system-ui, -apple-system, Roboto, sans-serif; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.inf-cab { display: flex; justify-content: space-between; align-items: flex-end; gap: 20px; padding-bottom: 10px; border-bottom: 3px solid #0b2f6b; box-shadow: 0 3px 0 #e31b23; margin-bottom: 16px; }
+.inf-negocio { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.inf-negocio svg { width: 40px; height: 40px; flex: none; }
+.inf-negocio b { display: block; font-size: 14pt; text-transform: uppercase; letter-spacing: .03em; color: #0b2f6b; line-height: 1.15; }
+.inf-negocio span { font-size: 8.5pt; color: #555; }
+.inf-titulo { text-align: right; flex: none; }
+.inf-titulo h1 { font-size: 16pt; line-height: 1.15; color: #111; }
+.inf-titulo span { font-size: 9.5pt; color: #444; }
+.inf-datos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px 16px; margin: 0 0 12px; padding: 8px 10px; border: 1px solid #ccd3df; border-radius: 4px; }
+.inf-datos dt { font-size: 7pt; text-transform: uppercase; letter-spacing: .06em; color: #666; }
+.inf-datos dd { margin: 0; font-weight: 600; }
+.inf-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(105px, 1fr)); gap: 8px; margin-bottom: 16px; }
+.inf-kpis div { border: 1px solid #ccd3df; border-top: 3px solid #0b2f6b; border-radius: 4px; padding: 6px 9px; break-inside: avoid; }
+.inf-kpis > div > span { display: block; font-size: 7pt; text-transform: uppercase; letter-spacing: .06em; color: #555; }
+.inf-kpis b { display: block; font-size: 13pt; font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+.inf-kpis small { font-size: 7.5pt; color: #555; }
+.inf-debe { color: #b42318; }
+.inf-sec { margin-bottom: 16px; }
+.inf-sec.col { display: inline-block; vertical-align: top; width: calc(50% - 8px); }
+.inf-sec.col + .inf-sec.col { margin-left: 16px; }
+.inf-sec h2 { font-size: 9.5pt; text-transform: uppercase; letter-spacing: .06em; color: #0b2f6b; margin-bottom: 6px; padding-bottom: 3px; border-bottom: 1px solid #ccd3df; break-after: avoid; }
+.inf-sec p { margin: 0; }
+.inf-tabla { width: 100%; border-collapse: collapse; font-size: 8.8pt; }
+.inf-tabla thead { display: table-header-group; }
+.inf-tabla tfoot { display: table-row-group; }
+.inf-tabla th { text-align: left; font-size: 7pt; text-transform: uppercase; letter-spacing: .05em; color: #444; background: #eef1f6; padding: 4px 6px; border-bottom: 1px solid #98a2b3; white-space: nowrap; }
+.inf-tabla td { padding: 3.5px 6px; border-bottom: 1px solid #e3e7ee; vertical-align: top; }
+.inf-tabla tr { break-inside: avoid; }
+.inf-tabla .der { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.inf-tabla .centro { text-align: center; color: #666; }
+.inf-tabla small { display: block; color: #666; font-size: 7.5pt; }
+.inf-tabla tfoot td { font-weight: 700; border-top: 1.5px solid #333; border-bottom: 0; padding-top: 5px; }
+.inf-tabla tr.grupo td { background: #f4f6fa; color: #0b2f6b; font-weight: 700; padding-top: 6px; }
+.inf-tabla tr.sub td { font-weight: 600; color: #333; border-bottom: 1px solid #98a2b3; }
+.inf-vacio { color: #666; font-style: italic; }
+.inf-sec.firmas { display: flex; gap: 48px; margin-top: 46px; break-inside: avoid; }
+.firmas div { flex: 1; border-top: 1px solid #333; padding-top: 4px; font-size: 8.5pt; color: #444; text-align: center; }
+.inf-pie { display: flex; justify-content: space-between; gap: 12px; margin-top: 20px; padding-top: 6px; border-top: 1px solid #ccd3df; font-size: 7.5pt; color: #666; }
+
+/* ── Impresión: solo el recibo o el informe ── */
 @media print {
+  html, body { background: #fff !important; color: #000; height: auto; }
   body > *:not(#impresion) { display: none !important; }
   #impresion { display: block; }
   .recibo { max-width: none; padding: 0; border: 0; }
   @page { margin: 4mm; }
+  @page informe {
+    margin: 12mm 12mm 14mm;
+    @bottom-right { content: "Página " counter(page) " de " counter(pages); font: 8pt "Segoe UI", sans-serif; color: #666; }
+  }
 }

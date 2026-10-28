@@ -33,6 +33,18 @@ const CLAVE_ARCHIVO = path.join(DIR_DATOS, 'clave.txt');
 if (!fs.existsSync(CLAVE_ARCHIVO)) fs.writeFileSync(CLAVE_ARCHIVO, Array.from(crypto.randomBytes(8), b => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[b % 32]).join(''));
 const CLAVE = fs.readFileSync(CLAVE_ARCHIVO, 'utf8').trim();
 const esLocal = req => ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.socket.remoteAddress);
+// Solo se aceptan pedidos hechos desde la propia aplicación. Esto evita que una página web
+// cualquiera, abierta en el navegador de este computador, lea o meta datos en la tienda.
+const NOMBRE_PC = os.hostname().toLowerCase();
+const hostValido = req => {
+  const h = String(req.headers.host || '').toLowerCase().replace(/:\d+$/, '').replace(/^\[|\]$/g, '');
+  return h === 'localhost' || h === NOMBRE_PC || h.endsWith('.local') || /^\d{1,3}(\.\d{1,3}){3}$/.test(h) || h.includes(':');
+};
+const mismoOrigen = req => {
+  const o = req.headers.origin;
+  if (!o) return true;
+  try { return new URL(o).host === req.headers.host; } catch (e) { return false; }
+};
 const claveOk = req => {
   const dada = Buffer.from(String(req.headers['x-clave'] || '')), buena = Buffer.from(CLAVE);
   return dada.length === buena.length && crypto.timingSafeEqual(dada, buena);
@@ -95,7 +107,9 @@ const json = (res, obj, estado = 200) => { res.writeHead(estado, { 'Content-Type
 http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url, 'http://x');
+    if (url.pathname.startsWith('/api/') && (!hostValido(req) || !mismoOrigen(req))) return json(res, { error: 'Pedido no permitido' }, 403);
     if (url.pathname === '/api/ping') return json(res, { app: 'tienda-ebenezer', id: ID, ...(esLocal(req) ? { clave: CLAVE } : {}) });
+    if (url.pathname.startsWith('/api/') && req.method === 'POST' && !String(req.headers['content-type'] || '').startsWith('application/json')) return json(res, { error: 'Pedido no permitido' }, 415);
     if (url.pathname.startsWith('/api/') && !esLocal(req) && !claveOk(req)) return json(res, { error: 'Clave del servidor incorrecta' }, 401);
     if (url.pathname === '/api/acceso') return json(res, { ok: true });
     if (url.pathname === '/api/sync') {

@@ -60,11 +60,11 @@
     },
     async render(el) {
       el.innerHTML = `<div class="cabeza"><h2>Compras</h2><div class="fila">
-          ${T.auth.puede('ia.usar') ? `<button class="btn ia" id="foto">${T.ico('camara')} Foto de la factura</button>` : ''}
+          ${T.auth.puede('ia.usar') ? `<button class="btn ia" id="foto">${T.ico('factura')} Factura con IA</button>` : ''}
           <button class="btn pri" id="nueva">${T.ico('mas')} Compra</button><button class="btn" id="prov">${T.ico('mas')} Proveedor</button></div></div>
         <div class="pestanas" id="pes"></div><div id="cont"></div>`;
       pestanas(T.$('#pes', el), [['compras', 'Compras'], ['pedido', 'Pedido sugerido'], ['deudas', 'Por pagar'], ['proveedores', 'Proveedores']], this.pestana, t => { this.pestana = t; this.render(el); });
-      const foto = T.$('#foto', el); if (foto) foto.onclick = () => T.ui.fotoIA('factura');
+      const foto = T.$('#foto', el); if (foto) foto.onclick = () => T.ui.facturaIA();
       T.$('#nueva', el).onclick = () => T.ui.entrada({ esCompra: true });
       T.$('#prov', el).onclick = async () => { if (await T.ui.editarProveedor()) { this.pestana = 'proveedores'; this.render(el); } };
       const cont = T.$('#cont', el);
@@ -92,7 +92,8 @@
         const c = compras.find(x => x.id === b.dataset.c);
         if (b.dataset.a === 'ver') return T.modal({
           titulo: `Compra ${c.numero}`, ancho: 620, cuerpo: `<p class="suave" style="margin-bottom:10px">${T.fechaHora(c.fecha)} · ${T.esc(c.proveedor || 'Sin proveedor')} · registró ${T.esc(c.usuario)}</p>` +
-            T.tabla([{ t: 'Producto', v: l => T.esc(l.nombre) }, { t: 'Cant.', cls: 'der num', v: l => T.cant(l.cantidad) }, { t: 'Costo', cls: 'der num', v: l => T.money(l.costo) }, { t: 'Total', cls: 'der num', v: l => T.money(l.total) }], c.items) + `<p class="der" style="margin-top:10px"><b>Total ${T.money(c.total)}</b></p>`
+            T.tabla([{ t: 'Producto', v: l => T.esc(l.nombre) }, { t: 'Cant.', cls: 'der num', v: l => T.cant(l.cantidad) }, { t: 'Costo', cls: 'der num', v: l => T.money(l.costo) }, { t: 'Total', cls: 'der num', v: l => T.money(l.total) }], c.items) + `<p class="der" style="margin-top:10px"><b>Total ${T.money(c.total)}</b></p>`,
+          botones: [{ txt: `${T.ico('pdf')} PDF / Imprimir`, cls: 'sec', fn: () => { T.informes.compra(c); return false; } }, { txt: 'Cerrar', cls: 'pri' }]
         });
         const r = await T.pedir({
           titulo: `Pagar compra ${c.numero}`, nota: `Se debe ${T.money(c.saldo)} a ${c.proveedor || 'el proveedor'}.`, ok: 'Registrar pago', campos: [
@@ -133,6 +134,7 @@
       cuerpo: `<div class="rejilla"><div class="tarjeta kpi"><h4>Debe</h4><b>${T.money(c.saldo)}</b><small>Cupo ${T.money(c.cupo)}</small></div></div>` +
         T.tabla([{ t: 'Fecha', v: x => T.fechaHora(x.fecha) }, { t: 'Concepto', v: x => x.v ? `<a href="#" data-v="${x.v.id}">${T.esc(x.txt)}</a>` : T.esc(x.txt) }, { t: 'Valor', cls: 'der num', v: x => `<span class="etq ${x.valor > 0 ? 'aviso' : 'ok'}">${x.valor > 0 ? '+' : '−'}${T.money(Math.abs(x.valor))}</span>` }], movs, 'Este cliente no tiene fiados ni abonos.'),
       botones: [
+        { txt: `${T.ico('pdf')} Estado de cuenta`, cls: 'sec', fn: () => { T.informes.cuenta(T.db.get('clientes', c.id) || c, ventas, abonos); return false; } },
         ...(c.saldo > 0 && tel ? [{ txt: 'Cobrar por WhatsApp', cls: 'sec', fn: () => { window.open(`https://wa.me/${tel.length === 10 ? '57' + tel : tel}?text=${encodeURIComponent(`Hola ${c.nombre}, le saluda ${T.db.cfg('negocio', {}).nombre || 'la tienda'}. Le recordamos que tiene un saldo pendiente de ${T.money(c.saldo)}. ¡Gracias!`)}`, '_blank', 'noopener'); return false; } }] : []),
         ...(c.saldo > 0 && T.auth.puede('abonos.crear') ? [{ txt: 'Recibir abono', cls: 'pri', fn: async () => { if (!await T.ui.abonar(c)) return false; alCambiar && alCambiar(); } }] : []),
         { txt: 'Cerrar', cls: 'sec' }]
@@ -144,7 +146,7 @@
     q: '', soloDeben: false,
     render(el) {
       const todos = T.db.lista('clientes'), editar = T.auth.puede('clientes.editar');
-      el.innerHTML = `<div class="cabeza"><h2>Clientes y fiados</h2>${editar ? `<button class="btn pri" id="nuevo">${T.ico('mas')} Cliente</button>` : ''}</div>
+      el.innerHTML = `<div class="cabeza"><h2>Clientes y fiados</h2><div class="fila"><button class="btn" id="cartera">${T.ico('pdf')} Cartera PDF</button>${editar ? `<button class="btn pri" id="nuevo">${T.ico('mas')} Cliente</button>` : ''}</div></div>
         <div class="rejilla"><div class="tarjeta kpi"><h4>Total por cobrar</h4><b>${T.money(todos.reduce((a, c) => a + Math.max(0, c.saldo || 0), 0))}</b><small>${todos.filter(c => c.saldo > 0).length} cliente(s) deben</small></div></div>
         <div class="fila" style="margin-bottom:12px"><div class="buscador crece">${T.ico('buscar')}<input id="q" value="${T.esc(this.q)}" placeholder="Buscar cliente"></div>
           <label class="campo check" style="grid-column:auto"><input type="checkbox" id="deben" ${this.soloDeben ? 'checked' : ''}><span>Solo los que deben</span></label></div><div id="tabla"></div>`;
@@ -159,6 +161,7 @@
       };
       T.$('#q', el).oninput = e => { this.q = e.target.value; pintar(); };
       T.$('#deben', el).onchange = e => { this.soloDeben = e.target.checked; pintar(); };
+      T.$('#cartera', el).onclick = () => T.informes.cartera();
       const nuevo = T.$('#nuevo', el); if (nuevo) nuevo.onclick = async () => { if (await T.ui.editarCliente()) this.render(el); };
       T.$('#tabla', el).onclick = async e => {
         const b = e.target.closest('[data-a]'); if (!b) return;
@@ -175,6 +178,7 @@
   const cuadro = (caja, r) => `<ul class="lista-simple">
       <li><span>Base con la que abrió</span><span class="num">${T.money(caja.base)}</span></li>
       <li><span>Ventas en efectivo</span><span class="num">+${T.money(r.porMetodo.efectivo || 0)}</span></li>
+      ${r.efectivoAnuladas ? `<li><span>Ventas anuladas en otra caja<br><small class="suave">El efectivo entró aquí y se devolvió en la otra</small></span><span class="num">+${T.money(r.efectivoAnuladas)}</span></li>` : ''}
       <li><span>Abonos en efectivo</span><span class="num">+${T.money(r.abonosPorMetodo.efectivo || 0)}</span></li>
       <li><span>Otros ingresos</span><span class="num">+${T.money(r.ingreso)}</span></li>
       <li><span>Gastos</span><span class="num">−${T.money(r.gasto)}</span></li>
@@ -189,7 +193,7 @@
     const html = `<div class="recibo" style="max-width:300px"><h5>${T.esc(n.nombre || 'Tienda')}</h5><div class="c">CIERRE DE CAJA ${T.esc(c.numero)}</div><hr>
       <div>Abrió: ${T.esc(c.usuario)} · ${T.fechaHora(c.apertura)}<br>Cerró: ${T.esc(c.cerro || '')} · ${T.fechaHora(c.cierre)}</div><hr>
       <table>${Object.entries(T.METODOS).map(([k, v]) => `<tr><td>Ventas ${v}</td><td>${T.num(r.porMetodo[k] || 0)}</td></tr>`).join('')}<tr class="t"><td>TOTAL VENTAS</td><td>${T.num(r.total)}</td></tr><tr><td>Tiquetes / anuladas</td><td>${r.ventas} / ${r.anuladas}</td></tr></table><hr>
-      <table><tr><td>Base</td><td>${T.num(c.base)}</td></tr><tr><td>Abonos efectivo</td><td>${T.num(r.abonosPorMetodo.efectivo || 0)}</td></tr><tr><td>Ingresos</td><td>${T.num(r.ingreso)}</td></tr><tr><td>Gastos</td><td>−${T.num(r.gasto)}</td></tr><tr><td>Pagos proveedores</td><td>−${T.num(r.compra)}</td></tr><tr><td>Retiros</td><td>−${T.num(r.retiro)}</td></tr><tr><td>Devoluciones</td><td>−${T.num(r.devolucion)}</td></tr>
+      <table><tr><td>Base</td><td>${T.num(c.base)}</td></tr>${r.efectivoAnuladas ? `<tr><td>Anuladas en otra caja</td><td>${T.num(r.efectivoAnuladas)}</td></tr>` : ''}<tr><td>Abonos efectivo</td><td>${T.num(r.abonosPorMetodo.efectivo || 0)}</td></tr><tr><td>Ingresos</td><td>${T.num(r.ingreso)}</td></tr><tr><td>Gastos</td><td>−${T.num(r.gasto)}</td></tr><tr><td>Pagos proveedores</td><td>−${T.num(r.compra)}</td></tr><tr><td>Retiros</td><td>−${T.num(r.retiro)}</td></tr><tr><td>Devoluciones</td><td>−${T.num(r.devolucion)}</td></tr>
       <tr class="t"><td>DEBE HABER</td><td>${T.num(r.esperado)}</td></tr><tr class="t"><td>CONTADO</td><td>${T.num(c.contado)}</td></tr><tr class="t"><td>${c.diferencia < 0 ? 'FALTANTE' : c.diferencia > 0 ? 'SOBRANTE' : 'CUADRADA'}</td><td>${T.num(c.diferencia)}</td></tr></table>
       ${c.nota ? `<hr><div>Nota: ${T.esc(c.nota)}</div>` : ''}<hr><div class="c">Firma: ____________________</div></div>`;
     T.modal({ titulo: 'Cierre ' + c.numero, ancho: 400, cuerpo: html, botones: [{ txt: T.ico('imprimir') + ' Imprimir', cls: 'sec', fn: () => { T.imprimir(html); return false; } }, { txt: 'Cerrar', cls: 'pri' }] });

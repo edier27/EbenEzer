@@ -141,10 +141,10 @@
                 <button class="btn-ico" id="salir" title="Cerrar sesión" aria-label="Cerrar sesión">${T.ico('salir')}</button></div>
             </div>
           </div>
-          <nav id="nav">${menu.map(([id, t]) => `<a href="#${id}" data-v="${id}">${T.ico(id)}<span>${t}</span></a>`).join('')}</nav>
+          <nav id="nav">${menu.map(([id, t]) => `<a href="#${id}" data-v="${id}">${T.ico(id)}<span>${t}</span></a>`).join('')}<a href="#" class="solo-movil" id="salir-movil">${T.ico('salir')}<span>Cerrar sesión</span></a></nav>
         </header>
         <main id="principal"></main></div>`;
-      T.$('#salir').onclick = async () => { await T.auth.salir(); this.login(); };
+      T.$('#salir').onclick = T.$('#salir-movil').onclick = async e => { e.preventDefault(); await T.auth.salir(); this.login(); };
       T.$('#abrir-menu').onclick = () => T.$('#app').classList.toggle('menu-abierto');
       T.$('#app').addEventListener('click', e => { if (e.target.id === 'app' || e.target.closest('#nav a')) T.$('#app').classList.remove('menu-abierto'); });
       T.$('#est-sync').onclick = () => { location.hash = '#config'; T.vistas.config.pestana = 'copias'; this.navegar(); };
@@ -181,9 +181,12 @@
       if (!item || !T.vistas[id] || !T.$(`#nav [data-v="${id}"]`)) id = 'inicio';
       this.actual = id;
       T.$$('#nav a').forEach(a => a.classList.toggle('activo', a.dataset.v === id));
-      T.$('#titulo-movil').textContent = MENU.find(m => m[0] === id)[1];
+      const titulo = MENU.find(m => m[0] === id)[1];
+      T.$('#titulo-movil').textContent = titulo;
+      document.title = `${titulo} · ${negocio().nombre || 'Tienda'}`;
       // Cada navegación pinta en su propio contenedor: si llega otra antes de terminar, no se pisan.
       const el = document.createElement('div');
+      el.innerHTML = '<div class="pensando cargando">Cargando…</div>';
       T.$('#principal').replaceChildren(el);
       try { await T.vistas[id].render(el); }
       catch (e) { console.error(e); el.innerHTML = `<p class="vacio">No se pudo mostrar esta pantalla: ${T.esc(e.message)}</p>`; }
@@ -239,7 +242,7 @@
       const lista = (arr, f, vacio) => arr.length ? `<ul class="lista-simple">${arr.slice(0, 6).map(f).join('')}</ul>${arr.length > 6 ? `<small class="suave">y ${arr.length - 6} más…</small>` : ''}` : `<p class="suave">${vacio}</p>`;
       el.innerHTML = `
         <div class="cabeza"><div><h2>Resumen del día</h2><span class="suave">${new Date().toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</span></div>
-          <div class="fila">${T.auth.puede('ventas.crear') ? `<a class="btn pri" href="#vender">${T.ico('vender')} Vender</a>` : ''}${T.auth.puede('inventario.editar') ? `<button class="btn ia" id="foto">${T.ico('camara')} Foto al inventario</button>` : ''}</div></div>
+          <div class="fila">${T.auth.puede('ventas.crear') ? `<a class="btn pri" href="#vender">${T.ico('vender')} Vender</a>` : ''}${T.auth.puede('compras.crear') && T.auth.puede('ia.usar') ? `<button class="btn ia" id="factura">${T.ico('factura')} Factura con IA</button>` : ''}${T.auth.puede('inventario.editar') && T.auth.puede('ia.usar') ? `<button class="btn" id="foto">${T.ico('camara')} Foto al inventario</button>` : ''}</div></div>
         ${!T.sync.hub && !T.db.loc('nubeUid') && (sinResp === null || sinResp >= 1) ? `<div class="banda aviso">${T.ico('alerta')}<span>${sinResp === null ? 'Aún no hay ninguna copia de seguridad.' : `Hace ${sinResp} día(s) no se hace copia de seguridad.`} Los datos solo están en este navegador.</span>${T.auth.puede('respaldo.gestionar') ? '<button class="btn" id="resp">Descargar copia</button>' : ''}</div>` : ''}
         ${!caja && T.auth.puede('caja.operar') ? `<div class="banda">${T.ico('caja')}<span>La caja está cerrada.</span><a class="btn" href="#caja">Abrir caja</a></div>` : ''}
         ${verPlata ? `<div class="rejilla">
@@ -257,8 +260,9 @@
           ${verPlata ? `<div class="tarjeta"><h4>Más vendidos hoy</h4>${lista(Object.values(d.productos).sort((a, b) => b.total - a.total), p => `<li><span>${T.esc(p.nombre)} <small class="suave">× ${T.cant(p.cantidad)}</small></span><span class="num">${T.money(p.total)}</span></li>`, 'Todavía no hay ventas hoy.')}</div>` : ''}
           <div class="tarjeta"><h4>Clientes que más deben</h4>${lista(deben.sort((a, b) => b.saldo - a.saldo), c => `<li><span>${T.esc(c.nombre)}</span><span class="num">${T.money(c.saldo)}</span></li>`, 'Nadie debe.')}</div>
         </div>`;
-      const foto = T.$('#foto', el), resp = T.$('#resp', el);
+      const foto = T.$('#foto', el), resp = T.$('#resp', el), fac = T.$('#factura', el);
       if (foto) foto.onclick = () => T.ui.fotoIA('productos');
+      if (fac) fac.onclick = () => T.ui.facturaIA();
       if (resp) resp.onclick = async () => { await T.respaldo.descargar(); T.app.refrescar(); };
     }
   };

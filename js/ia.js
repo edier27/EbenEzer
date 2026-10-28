@@ -13,6 +13,12 @@
   const BASE = 'https://generativelanguage.googleapis.com/v1beta/';
   const MODELO_DEF = 'gemini-2.5-flash';
   const cfg = () => T.db.loc('ia', {});
+  // Número que puede venir como texto en formato colombiano: "1.500" = 1500 y "2,5" = 2.5.
+  const n = v => {
+    if (typeof v === 'number') return isFinite(v) ? v : 0;
+    const t = String(v ?? '').replace(/[$\s]/g, '');
+    return T.aNum(/^-?\d{1,3}(\.\d{3})+(,\d+)?$/.test(t) ? t.replace(/\./g, '') : t);
+  };
 
   async function pedir(ruta, cuerpo) {
     const r = await fetch(BASE + ruta, {
@@ -30,6 +36,7 @@
 
   T.ia = {
     lista: () => !!cfg().clave,
+    num: n,
     modelo: () => cfg().modelo || MODELO_DEF,
 
     // Modelos de la cuenta que aceptan imágenes y texto.
@@ -78,17 +85,48 @@ No inventes códigos de barras. Si no hay productos, responde {"productos":[]}.`
       return Array.isArray(r.productos) ? r.productos : [];
     },
 
-    async facturaDeFotos(imagenes) {
+    // Lee la factura (fotos o PDF de factura electrónica) y devuelve renglones ya convertidos
+    // a unidades sueltas con su costo por unidad. Cada renglón trae "revisar" cuando las
+    // cifras de la factura no cuadran entre sí.
+    async facturaDeFotos(archivos) {
+      const varias = archivos.length > 1;
       const r = await this.llamar({
-        json: true, imagenes,
-        texto: `Eres el asistente de compras de una tienda en Colombia. ${imagenes.length > 1 ? 'Las fotos son páginas de una misma' : 'La foto es una'} factura o remisión de proveedor.
-Extrae los datos y responde SOLO un JSON con esta forma:
-{"proveedor":"","nit":"","numero":"número de factura","fecha":"AAAA-MM-DD o vacío","total":total de la factura en pesos (entero),
-"items":[{"nombre":"descripción del producto tal como sirve para venderlo, con marca y presentación","codigo":"código de barras o referencia si aparece, si no vacío","categoria":"una de: ${T.categorias().join(', ')}","cantidad":unidades compradas (si viene por cajas o pacas, multiplica para dar unidades sueltas cuando la factura lo indique),"costoUnitario":costo por unidad CON IVA incluido en pesos (entero)}]}
-Usa punto o coma según el formato colombiano (1.500 = mil quinientos). No inventes renglones que no estén en la factura.`
+        json: true, imagenes: archivos,
+        texto: `Eres el auxiliar de compras de una tienda / supermercado en Colombia. ${varias ? 'Los archivos son páginas de una misma' : 'El archivo es una'} factura, factura electrónica o remisión de un proveedor.
+Lee TODOS los renglones de productos (de todas las páginas, sin repetir) y responde SOLO un JSON con esta forma:
+{"proveedor":"razón social del proveedor","nit":"NIT del proveedor","telefono":"","numero":"número de la factura","fecha":"AAAA-MM-DD o vacío",
+"subtotal":entero,"iva":entero,"descuentos":entero,"total":total a pagar de la factura (entero),
+"items":[{"nombre":"nombre del producto como se vendería en la tienda: marca, producto y tamaño, ej. Aceite Premier 1000 ml",
+"marca":"","codigo":"código de barras EAN (8 a 14 dígitos) si aparece; si no, vacío","referencia":"código interno del proveedor si aparece",
+"categoria":"una de: ${T.categorias().join(', ')}",
+"cantidad":cantidad facturada tal como aparece en el renglón,
+"empaque":"cómo se factura esa cantidad: unidad, caja x 24, paca x 12, six-pack, bulto, display x 10…",
+"unidadesPorEmpaque":unidades sueltas que trae cada empaque (1 si se factura por unidad),
+"valorTotal":valor total del renglón en pesos YA con IVA y descuentos (entero),
+"ivaPct":0, 5 o 19,
+"costoUnitario":costo de UNA unidad suelta con IVA incluido (entero)}]}
+Reglas: los números van en formato colombiano (1.500 = mil quinientos; 1.500,50 = mil quinientos con cincuenta centavos). Si el renglón muestra el valor antes de IVA, súmale el IVA. No inventes renglones ni datos: si algo no se lee, déjalo vacío o en 0. No incluyas fletes, retenciones ni bonificaciones sin producto.`
       });
-      r.items = Array.isArray(r.items) ? r.items : [];
-      return r;
+      const items = (Array.isArray(r.items) ? r.items : []).map(x => {
+        const cant = Math.max(0, n(x.cantidad)), porEmp = Math.max(1, Math.round(n(x.unidadesPorEmpaque)) || 1);
+        const unidades = T.r3((cant || 1) * porEmp), valor = T.red(n(x.valorTotal)), cu = T.red(n(x.costoUnitario));
+        // El total del renglón es lo más confiable de una factura; el costo por unidad sale de ahí.
+        const porValor = valor > 0 ? T.red(valor / unidades) : 0, costo = porValor || cu;
+        const revisar = !cant ? 'No se leyó la cantidad' : !costo ? 'No se leyó el costo'
+          : porValor && cu && Math.abs(porValor - cu) > Math.max(50, cu * 0.03) ? `La factura no cuadra: ${T.money(cu)} por unidad, pero el renglón da ${T.money(porValor)}` : '';
+        const codigo = String(x.codigo || '').replace(/\D/g, '');
+        return {
+          nombre: String(x.nombre || '').trim(), marca: String(x.marca || '').trim(), categoria: String(x.categoria || '').trim(),
+          codigo: codigo.length >= 8 ? codigo : '', referencia: String(x.referencia || '').trim(),
+          cantidad: unidades, costo, valor, iva: [0, 5, 19].includes(n(x.ivaPct)) ? n(x.ivaPct) : 0,
+          empaque: porEmp > 1 ? `${T.cant(cant || 1)} × ${String(x.empaque || 'empaque').trim()} = ${T.cant(unidades)} und` : '', revisar
+        };
+      }).filter(x => x.nombre);
+      return {
+        proveedor: String(r.proveedor || '').trim(), nit: String(r.nit || '').trim(), telefono: String(r.telefono || '').trim(),
+        numero: String(r.numero || '').trim(), fecha: /^\d{4}-\d{2}-\d{2}$/.test(r.fecha || '') ? r.fecha : '',
+        subtotal: T.red(n(r.subtotal)), iva: T.red(n(r.iva)), total: T.red(n(r.total)), items
+      };
     },
 
     // Datos compactos del negocio que acompañan cada pregunta al asistente.

@@ -115,57 +115,93 @@
     });
   };
 
-  // ── Foto con IA: productos o factura ──
+  // ── Agregar con IA: factura del proveedor o foto de productos ──
+  // La última factura leída queda guardada en este equipo hasta que se sube al inventario:
+  // si se cierra la ventana o se va la luz, se retoma sin volver a leerla.
+  const BORRADOR = 'borradorFactura';
+  const hace = ts => { const m = Math.round((Date.now() - ts) / 60000); return m < 1 ? 'hace un momento' : m < 60 ? `hace ${m} min` : m < 1440 ? `hace ${Math.round(m / 60)} h` : T.fechaHora(ts); };
+
+  T.ui.facturaIA = () => T.ui.fotoIA('factura');
   T.ui.fotoIA = (modo = 'productos') => {
     const fotos = [];
     const m = T.modal({
-      titulo: 'Agregar con foto', ancho: 560,
-      cuerpo: `<div class="metodos" style="grid-template-columns:1fr 1fr"><button data-modo="productos">${T.ico('inventario')} Productos o estante</button><button data-modo="factura">${T.ico('lista')} Factura del proveedor</button></div>
-        <p class="suave" id="ayuda"></p>
-        <div class="fila" style="margin-top:12px"><button class="btn pri crece" id="tomar">${T.ico('camara')} Tomar foto</button><button class="btn crece" id="elegir">Elegir del equipo</button></div>
+      titulo: 'Agregar con IA', ancho: 600,
+      cuerpo: `<div class="metodos" style="grid-template-columns:1fr 1fr;margin-top:0"><button data-modo="factura">${T.ico('factura')} Factura del proveedor</button><button data-modo="productos">${T.ico('inventario')} Productos o estante</button></div>
+        <div id="borrador"></div><ol class="pasos" id="ayuda"></ol>
+        <div class="fila" style="margin-top:12px"><button class="btn pri crece" id="tomar">${T.ico('camara')} Tomar foto</button><button class="btn crece" id="elegir">${T.ico('subir')} <span id="elegir-txt"></span></button></div>
         <div class="fotos-ia" id="fotos"></div><div id="estado"></div>`,
-      botones: [{ txt: 'Cancelar', cls: 'sec' }, { txt: T.ico('ia') + ' Analizar con IA', cls: 'ia', id: 'ok', fn: () => analizar() }]
+      botones: [{ txt: 'Cancelar', cls: 'sec' }, { txt: T.ico('ia') + ' Leer con IA', cls: 'ia', id: 'ok', fn: () => analizar() }]
     });
     const cu = m.cuerpo, pintar = () => {
-      T.$$('[data-modo]', cu).forEach(b => b.classList.toggle('activo', b.dataset.modo === modo));
-      T.$('#ayuda', cu).textContent = modo === 'productos' ? 'Tome una foto clara de los productos (de frente, con buena luz). La IA los reconoce y usted solo revisa cantidades y precios.' : 'Tome la foto de la factura completa y derecha. La IA lee los productos, cantidades y costos, y usted revisa antes de guardar.';
-      T.$('#fotos', cu).innerHTML = fotos.map(f => `<img src="${f}" alt="">`).join('');
+      const fac = modo === 'factura', b = fac && T.db.loc(BORRADOR);
+      T.$$('[data-modo]', cu).forEach(x => x.classList.toggle('activo', x.dataset.modo === modo));
+      T.$('#ayuda', cu).innerHTML = (fac
+        ? ['Tome una foto por cada hoja de la factura (derecha, completa y con buena luz) o elija el PDF de la factura electrónica.', 'La IA lee el proveedor, los productos, las cantidades y los costos.', 'Usted revisa y la sube al inventario con un solo botón.']
+        : ['Tome una foto clara de los productos, de frente y con buena luz.', 'La IA reconoce cada producto, su cantidad y un precio sugerido.', 'Usted revisa y los sube al inventario.']).map(t => `<li>${t}</li>`).join('');
+      T.$('#elegir-txt', cu).textContent = fac ? 'Elegir foto o PDF' : 'Elegir del equipo';
+      T.$('#borrador', cu).innerHTML = b ? `<div class="banda">${T.ico('factura')}<span>Hay una factura leída sin subir: ${T.esc(b.proveedor || 'proveedor sin nombre')} · ${b.filas.length} producto(s) · ${hace(b.fecha)}.</span><button class="btn" id="retomar">Retomar</button><button class="btn-ico" id="descartar" title="Descartar esa lectura" aria-label="Descartar esa lectura">${T.ico('borrar')}</button></div>` : '';
+      T.$('#fotos', cu).innerHTML = fotos.map((f, i) => `<figure>${T.esPDF(f) ? `<span class="pdf-mini">${T.ico('pdf')}PDF</span>` : `<img src="${f}" alt="Foto ${i + 1}">`}<button class="btn-ico" data-quitar="${i}" title="Quitar" aria-label="Quitar">${T.ico('x')}</button></figure>`).join('');
       if (!T.ia.lista()) T.$('#estado', cu).innerHTML = `<div class="banda aviso">${T.ico('alerta')}<span>Falta la clave de la IA.</span><a class="btn" href="#config" id="ir-cfg">Configurar</a></div>`;
     };
-    const sumar = async archivos => { for (const f of archivos) fotos.push(await T.img.leer(f)); pintar(); };
-    cu.onclick = e => {
+    const sumar = async archivos => {
+      try { for (const f of archivos) fotos.push(await T.leerParaIA(f)); }
+      catch (e) { T.toast(e.message, 'error'); }
+      pintar();
+    };
+    cu.onclick = async e => {
       const b = e.target.closest('[data-modo]'); if (b) { modo = b.dataset.modo; pintar(); }
+      const q = e.target.closest('[data-quitar]'); if (q) { fotos.splice(+q.dataset.quitar, 1); pintar(); }
       if (e.target.closest('#ir-cfg')) { T.vistas.config.pestana = 'ia'; m.cerrar(); }
+      if (e.target.closest('#retomar')) { const d = T.db.loc(BORRADOR); m.cerrar(); if (d) T.ui.entrada(d); }
+      if (e.target.closest('#descartar') && await T.confirmar('¿Descartar la factura leída? Tendría que volver a leerla con la IA.', { ok: 'Descartar', peligro: true })) { await T.db.setLoc(BORRADOR, null); pintar(); }
     };
     T.$('#tomar', cu).onclick = async () => sumar(await T.elegirArchivo('image/*', { camara: true }));
-    T.$('#elegir', cu).onclick = async () => sumar(await T.elegirArchivo('image/*', { multiple: true }));
+    T.$('#elegir', cu).onclick = async () => sumar(await T.elegirArchivo(modo === 'factura' ? 'image/*,application/pdf,.pdf' : 'image/*', { multiple: true }));
     pintar();
 
     async function analizar() {
-      if (!fotos.length) throw new Error('Primero tome o elija una foto');
-      T.$('#estado', cu).innerHTML = '<div class="pensando">La IA está mirando la foto…</div>';
+      if (!fotos.length) throw new Error(modo === 'factura' ? 'Primero tome la foto de la factura o elija el PDF' : 'Primero tome o elija una foto');
+      if (modo === 'productos' && fotos.some(T.esPDF)) throw new Error('Los PDF solo sirven para facturas. Quítelo o elija "Factura del proveedor".');
+      const est = T.$('#estado', cu);
+      est.innerHTML = `<div class="pensando">${modo === 'factura' ? 'La IA está leyendo la factura… puede tardar hasta un minuto.' : 'La IA está mirando la foto…'}</div>`;
       try {
-        const filas = [];
-        let extra = {};
         if (modo === 'productos') {
+          const filas = [];
           for (const x of await T.ia.productosDeFotos(fotos)) {
             const src = fotos[x.imagen] || fotos[0];
-            filas.push({ nombre: x.nombre, marca: x.marca, categoria: x.categoria, unidad: T.UNIDADES[x.unidad] ? x.unidad : 'und', codigo: String(x.codigo || '').replace(/\D/g, ''), cantidad: T.aNum(x.cantidad) || 1, costo: 0, precio: T.red(T.aNum(x.precioSugerido)), foto: await T.img.miniatura(src, x.caja).catch(() => '') });
+            filas.push({ nombre: x.nombre, marca: x.marca, categoria: x.categoria, unidad: T.UNIDADES[x.unidad] ? x.unidad : 'und', codigo: String(x.codigo || '').replace(/\D/g, ''), cantidad: T.ia.num(x.cantidad) || 1, costo: 0, precio: T.red(T.ia.num(x.precioSugerido)), foto: await T.img.miniatura(src, x.caja).catch(() => '') });
           }
+          if (!filas.length) throw new Error('La IA no reconoció productos. Pruebe con otra foto más cercana y con luz.');
+          await T.registrar('ia.foto', modo, { fotos: fotos.length, detectados: filas.length });
+          setTimeout(() => T.ui.entrada({ filas, esCompra: false, origen: 'foto-ia' }), 0);
         } else {
           const f = await T.ia.facturaDeFotos(fotos);
-          extra = { proveedor: f.proveedor || '', factura: f.numero || '', totalFactura: T.red(T.aNum(f.total)) };
-          f.items.forEach(x => filas.push({ nombre: x.nombre, categoria: x.categoria, unidad: 'und', codigo: String(x.codigo || '').trim(), cantidad: T.aNum(x.cantidad) || 1, costo: T.red(T.aNum(x.costoUnitario)), precio: 0 }));
+          if (!f.items.length) throw new Error('La IA no encontró productos en la factura. Pruebe con una foto más nítida, derecha y con buena luz.');
+          const datos = {
+            filas: f.items.map(x => ({ ...x, unidad: 'und', precio: 0 })), esCompra: true, origen: 'factura-ia', fotos: fotos.slice(),
+            proveedor: f.proveedor, nit: f.nit, telefono: f.telefono, factura: f.numero, fechaFactura: f.fecha, totalFactura: f.total
+          };
+          await T.db.setLoc(BORRADOR, { fecha: Date.now(), ...datos });
+          await T.registrar('ia.foto', 'factura', { fotos: fotos.length, detectados: f.items.length, proveedor: f.proveedor, factura: f.numero, total: f.total });
+          setTimeout(() => T.ui.entrada(datos), 0);
         }
-        if (!filas.length) throw new Error(modo === 'productos' ? 'La IA no reconoció productos. Pruebe con otra foto más cercana y con luz.' : 'La IA no pudo leer la factura. Pruebe con una foto más nítida.');
-        await T.registrar('ia.foto', modo, { fotos: fotos.length, detectados: filas.length });
-        setTimeout(() => T.ui.entrada({ filas, esCompra: modo === 'factura', origen: 'foto-ia', ...extra }), 0);
-      } catch (e) { T.$('#estado', cu).innerHTML = ''; throw e; }
+      } catch (e) { est.innerHTML = ''; throw e; }
     }
   };
 
-  // ── Entrada de mercancía (manual, por foto o por factura) ──
-  T.ui.entrada = ({ filas = [], esCompra = true, proveedor = '', factura = '', totalFactura = 0, origen = 'manual' } = {}) => new Promise(res => {
+  // Factura en grande (foto o PDF) para compararla con lo que leyó la IA.
+  const verArchivo = async (f, titulo) => {
+    let url = '';
+    if (T.esPDF(f)) url = URL.createObjectURL(await (await fetch(f)).blob());
+    T.modal({
+      titulo, ancho: 980, clase: 'modal-doc', alCerrar: () => { if (url) URL.revokeObjectURL(url); },
+      cuerpo: url ? `<iframe class="doc-grande" src="${url}" title="${T.esc(titulo)}"></iframe>` : `<img class="doc-grande" src="${f}" alt="${T.esc(titulo)}">`
+    });
+  };
+
+  // ── Entrada de mercancía (manual, por foto o por factura leída con IA) ──
+  T.ui.entrada = ({ filas = [], esCompra = true, proveedor = '', nit = '', telefono = '', factura = '', fechaFactura = '', totalFactura = 0, fotos = [], origen = 'manual' } = {}) => new Promise(res => {
+    const deFactura = origen === 'factura-ia';
     filas = filas.map(f => {
       const c = parecidos(f.nombre, f.codigo), mejor = c[0] && (c[0].pts >= 0.8) ? c[0].p : null;
       const fila = { ...f, candidatos: c.map(x => x.p), productoId: '' };
@@ -179,61 +215,101 @@
       if (!f.costo && origen !== 'foto-ia') f.costo = p.costo || 0;
       if (!f.candidatos.includes(p)) f.candidatos.unshift(p);
     }
+    const provDe = () => {
+      // Por nombre; si no, por el NIT que trae la factura (la razón social suele venir escrita distinto).
+      const nom = T.norm(T.$('#prov', cu).value), digitos = s => String(s || '').replace(/\D/g, '').slice(0, 9), n = digitos(nit);
+      if (!nom) return null;
+      return T.db.lista('proveedores').find(x => T.norm(x.nombre) === nom) || (n.length >= 6 && T.db.lista('proveedores').find(x => digitos(x.nit) === n)) || null;
+    };
     const m = T.modal({
-      titulo: 'Entrada de mercancía', ancho: 1040, alCerrar: v => res(v || null),
-      cuerpo: `<label class="campo check"><input type="checkbox" id="esCompra" ${esCompra ? 'checked' : ''}><span>Es una compra a un proveedor<small>Apáguelo si solo está contando lo que ya tenía en la tienda.</small></span></label>
-        <div class="form" id="cab" style="margin:8px 0 14px">
-          <label class="campo medio"><span>Proveedor</span><input id="prov" list="dl-prov" value="${T.esc(proveedor)}" placeholder="Nombre del proveedor"><datalist id="dl-prov">${T.db.lista('proveedores').map(p => `<option value="${T.esc(p.nombre)}">`).join('')}</datalist></label>
-          <label class="campo medio"><span>N.º de factura</span><input id="fac" value="${T.esc(factura)}"></label>
+      titulo: deFactura ? 'Revisar factura antes de subir' : 'Entrada de mercancía', ancho: 1100, alCerrar: v => res(v || null),
+      antesDeCerrar: () => !filas.length || T.confirmar(deFactura ? '¿Cerrar sin subir la factura?\nLa lectura queda guardada en este equipo y puede retomarla desde "Factura con IA".' : '¿Cerrar sin guardar? Se pierden los productos que agregó.', { titulo: 'Cerrar sin guardar', ok: 'Cerrar', peligro: !deFactura }),
+      cuerpo: `${fotos.length ? `<div class="doc-tira">${fotos.map((f, i) => `<button data-ver="${i}" title="Ver la factura en grande">${T.esPDF(f) ? `<span class="pdf-mini">${T.ico('pdf')}PDF</span>` : `<img src="${f}" alt="Hoja ${i + 1} de la factura">`}</button>`).join('')}
+          <p class="suave">Toque la factura para verla en grande y compararla con lo que leyó la IA.${fechaFactura ? `<br>Fecha de la factura: <b>${T.fechaCorta(fechaFactura)}</b>` : ''}</p></div>` : ''}
+        <label class="campo check"><input type="checkbox" id="esCompra" ${esCompra ? 'checked' : ''}><span>Es una compra a un proveedor<small>Apáguelo si solo está contando lo que ya tenía en la tienda.</small></span></label>
+        <div class="form form-3" id="cab" style="margin:8px 0 14px">
+          <label class="campo"><span>Proveedor</span><input id="prov" list="dl-prov" value="${T.esc(proveedor)}" placeholder="Nombre del proveedor"><datalist id="dl-prov">${T.db.lista('proveedores').map(p => `<option value="${T.esc(p.nombre)}">`).join('')}</datalist><small id="prov-info"></small></label>
+          <label class="campo"><span>N.º de factura</span><input id="fac" value="${T.esc(factura)}"></label>
           <label class="campo"><span>Cómo se pagó</span><select id="pago"><option value="otro">Ya está pagada (por fuera de la caja)</option><option value="caja">Se pagó con plata de la caja</option><option value="credito">Se queda debiendo al proveedor</option></select></label>
         </div>
-        <div id="filas"></div>
+        <div id="avisos-ent"></div><div id="filas"></div>
         <div class="fila" style="margin-top:10px"><div class="buscador crece">${T.ico('buscar')}<input id="bus" placeholder="Agregar un producto del inventario…" autocomplete="off"></div><button class="btn" id="nuevo">${T.ico('mas')} Producto nuevo</button></div>
-        <div id="res" class="chips"></div><p id="tot" style="margin-top:8px;font-weight:700"></p>`,
-      botones: [{ txt: 'Cancelar', cls: 'sec' }, { txt: 'Guardar en el inventario', cls: 'pri', fn: () => guardar() }]
+        <div id="res" class="chips"></div><div class="ent-resumen" id="tot"></div>`,
+      botones: [{ txt: 'Cancelar', cls: 'sec' }, { txt: `${T.ico('subir')} Subir al inventario`, cls: 'pri grande', fn: () => guardar() }]
     });
     const cu = m.cuerpo;
     // Presentaciones del producto enlazado: permiten digitar la compra en pacas o cajas.
     const presDe = f => (f.productoId && T.db.get('productos', f.productoId).presentaciones) || [];
     const factorDe = f => (presDe(f).find(x => x.id === f.presCompra) || { factor: 1 }).factor;
+    const bajoCosto = f => f.costo > 0 && f.precio > 0 && f.precio * factorDe(f) < f.costo;
+    const sinPrecio = f => !f.productoId && !(f.precio > 0);
+    const etiquetas = f => {
+      const p = f.productoId && T.db.get('productos', f.productoId);
+      return `${p ? `<span class="etq ok">Ya existe · hay ${T.cant(p.stock)}</span>` : '<span class="etq info">Nuevo</span>'}${f.empaque ? `<span class="etq">${T.esc(f.empaque)}</span>` : ''}${f.revisar ? `<span class="etq aviso" title="${T.esc(f.revisar)}">${T.ico('alerta')} ${T.esc(f.revisar)}</span>` : ''}${bajoCosto(f) ? '<span class="etq mal">Precio menor que el costo</span>' : sinPrecio(f) ? '<span class="etq mal">Falta el precio de venta</span>' : ''}`;
+    };
     const pintar = () => {
       const compra = T.$('#esCompra', cu).checked;
       T.$('#cab', cu).classList.toggle('oculto', !compra);
-      T.$('#filas', cu).innerHTML = filas.length ? `<div class="tabla-caja"><table class="tabla"><thead><tr><th style="min-width:230px">Producto</th><th>Código</th><th>Categoría</th><th>Cantidad</th><th>Costo</th><th>Precio venta</th><th></th></tr></thead><tbody>
-        ${filas.map((f, i) => `<tr data-i="${i}">
-          <td><div class="fila" style="flex-wrap:nowrap">${f.foto ? `<img class="mini-foto" src="${f.foto}" alt="">` : ''}<div class="crece">
-            <input data-k="nombre" value="${T.esc(f.productoId ? T.db.get('productos', f.productoId).nombre : f.nombre)}" ${f.productoId ? 'disabled' : ''} aria-label="Nombre">
-            <select data-k="productoId" aria-label="Producto existente" style="margin-top:4px"><option value="">➕ Crear como producto nuevo</option>${f.candidatos.map(p => `<option value="${p.id}" ${p.id === f.productoId ? 'selected' : ''}>Ya existe: ${T.esc(p.nombre)} (hay ${T.cant(p.stock)})</option>`).join('')}</select></div></div></td>
-          <td><input data-k="codigo" value="${T.esc(f.productoId ? T.db.get('productos', f.productoId).codigo || '' : f.codigo || '')}" ${f.productoId ? 'disabled' : ''} style="width:130px" aria-label="Código"></td>
-          <td><select data-k="categoria" ${f.productoId ? 'disabled' : ''} aria-label="Categoría">${['', ...T.categorias()].map(c => `<option ${c === (f.productoId ? T.db.get('productos', f.productoId).categoria : f.categoria) ? 'selected' : ''}>${T.esc(c)}</option>`).join('')}</select></td>
-          <td><input data-k="cantidad" type="number" step="any" value="${f.cantidad ?? ''}" style="width:84px" aria-label="Cantidad">${presDe(f).length ? `<select data-k="presCompra" style="margin-top:4px;width:auto" aria-label="Se compra por"><option value="">unidades</option>${presDe(f).map(x => `<option value="${x.id}" ${x.id === f.presCompra ? 'selected' : ''}>${T.esc(x.nombre)}</option>`).join('')}</select>` : ''}</td>
-          <td><input data-k="costo" type="number" value="${f.costo || ''}" style="width:104px" aria-label="Costo"></td>
-          <td><input data-k="precio" type="number" value="${f.precio || ''}" style="width:104px" aria-label="Precio"></td>
-          <td><button class="btn-ico" data-quitar aria-label="Quitar">${T.ico('borrar')}</button></td></tr>`).join('')}</tbody></table></div>` : '<p class="vacio">Agregue productos con el buscador de abajo.</p>';
+      T.$('#filas', cu).innerHTML = filas.length ? `<div class="tabla-caja"><table class="tabla tabla-entrada"><thead><tr><th style="min-width:260px">Producto</th><th>Código</th><th>Categoría</th><th class="der">Cantidad</th><th class="der">Costo c/u</th><th class="der">Precio venta</th><th></th></tr></thead><tbody>
+        ${filas.map((f, i) => {
+          const p = f.productoId && T.db.get('productos', f.productoId), cats = T.categorias(), cat = p ? p.categoria : f.categoria;
+          if (cat && !cats.includes(cat)) cats.push(cat);
+          return `<tr data-i="${i}" class="${f.revisar ? 'revisar' : ''}">
+          <td><div class="fila" style="flex-wrap:nowrap;align-items:flex-start">${f.foto ? `<img class="mini-foto" src="${f.foto}" alt="">` : ''}<div class="crece">
+            <input data-k="nombre" value="${T.esc(p ? p.nombre : f.nombre)}" ${p ? 'disabled' : ''} aria-label="Nombre">
+            <select data-k="productoId" aria-label="Producto existente" style="margin-top:4px"><option value="">➕ Crear como producto nuevo</option>${f.candidatos.map(c => `<option value="${c.id}" ${c.id === f.productoId ? 'selected' : ''}>Es el mismo que: ${T.esc(c.nombre)} (hay ${T.cant(c.stock)})</option>`).join('')}</select>
+            <div class="ent-etqs" data-etq>${etiquetas(f)}</div></div></div></td>
+          <td><input data-k="codigo" value="${T.esc(p ? p.codigo || '' : f.codigo || '')}" ${p ? 'disabled' : ''} style="width:130px" aria-label="Código"></td>
+          <td><select data-k="categoria" ${p ? 'disabled' : ''} aria-label="Categoría" style="min-width:130px">${['', ...cats].map(c => `<option ${c === cat ? 'selected' : ''}>${T.esc(c)}</option>`).join('')}</select></td>
+          <td class="der"><input data-k="cantidad" type="number" step="any" value="${f.cantidad ?? ''}" style="width:84px;text-align:right" aria-label="Cantidad">${presDe(f).length ? `<select data-k="presCompra" style="margin-top:4px;width:auto" aria-label="Se compra por"><option value="">unidades</option>${presDe(f).map(x => `<option value="${x.id}" ${x.id === f.presCompra ? 'selected' : ''}>${T.esc(x.nombre)}</option>`).join('')}</select>` : ''}</td>
+          <td class="der"><input data-k="costo" type="number" value="${f.costo || ''}" style="width:104px;text-align:right" aria-label="Costo por unidad"></td>
+          <td class="der"><input data-k="precio" type="number" value="${f.precio || ''}" style="width:104px;text-align:right" aria-label="Precio de venta">${p && p.precio && f.precio !== p.precio ? `<br><small class="suave">antes ${T.money(p.precio)}</small>` : ''}</td>
+          <td><button class="btn-ico" data-quitar aria-label="Quitar" title="Quitar">${T.ico('borrar')}</button></td></tr>`;
+        }).join('')}</tbody></table></div>` : '<p class="vacio">Agregue productos con el buscador de abajo.</p>';
       pintarTotal();
     };
     const pintarTotal = () => {
-      const total = filas.reduce((a, f) => a + T.red((f.cantidad || 0) * (f.costo || 0)), 0);
-      T.$('#tot', cu).innerHTML = `${filas.length} producto(s) · Total a costo: ${T.money(total)}${totalFactura ? ` · <span class="etq ${Math.abs(totalFactura - total) <= 100 ? 'ok' : 'aviso'}">La factura dice ${T.money(totalFactura)}${Math.abs(totalFactura - total) > 100 ? ' — revise cantidades y costos' : ''}</span>` : ''}`;
+      const total = filas.reduce((a, f) => a + T.red((f.cantidad || 0) * (f.costo || 0)), 0), nuevos = filas.filter(f => !f.productoId).length;
+      const malos = filas.filter(f => bajoCosto(f) || sinPrecio(f)).length, revisar = filas.filter(f => f.revisar).length;
+      T.$('#avisos-ent', cu).innerHTML = (malos ? `<div class="banda aviso">${T.ico('alerta')}<span>${malos} producto(s) sin precio de venta o con precio menor que el costo.</span><button class="btn" id="sugerir">Poner precio con ${T.regla('margenDefecto')}% de ganancia</button></div>` : '')
+        + (revisar ? `<div class="banda aviso">${T.ico('alerta')}<span>Revise ${revisar === 1 ? 'el renglón marcado' : `los ${revisar} renglones marcados`}: compárelo${revisar === 1 ? '' : 's'} con la factura.</span></div>` : '');
+      const dif = totalFactura ? totalFactura - total : 0;
+      T.$('#tot', cu).innerHTML = filas.length ? `<span><b>${filas.length}</b> producto(s)</span><span><b>${nuevos}</b> nuevo(s)</span><span><b>${filas.length - nuevos}</b> ya existen</span><span class="crece"></span>
+        ${totalFactura ? `<span class="etq ${Math.abs(dif) <= 100 ? 'ok' : 'aviso'}">${Math.abs(dif) <= 100 ? `${T.ico('ok')} Cuadra con la factura` : `La factura dice ${T.money(totalFactura)} · diferencia ${T.money(Math.abs(dif))}`}</span>` : ''}<span>Total a costo <b class="num">${T.money(total)}</b></span>` : '';
     };
     // Solo se redibuja la tabla al enlazar un producto: así no se pierde el foco al pasar de casilla.
     T.$('#filas', cu).onchange = e => {
       const tr = e.target.closest('tr'), k = e.target.dataset.k; if (!tr || !k) return;
       const f = filas[+tr.dataset.i];
-      if (k === 'productoId') { f.productoId = ''; f.presCompra = ''; if (e.target.value) enlazar(f, T.db.get('productos', e.target.value)); return pintar(); }
+      if (k === 'productoId') { f.productoId = ''; f.presCompra = ''; if (e.target.value) enlazar(f, T.db.get('productos', e.target.value)); else if (!f.precio && f.costo) f.precio = T.neg.precioSugerido(f.costo); return pintar(); }
       if (k === 'presCompra') {   // el costo pasa de "por unidad" a "por paca" (o al revés)
         const antes = factorDe(f); f.presCompra = e.target.value;
         f.costo = T.red((f.costo || 0) / antes * factorDe(f)); return pintar();
       }
       if (['cantidad', 'costo', 'precio'].includes(k)) {
         f[k] = T.aNum(e.target.value);
+        if (k !== 'precio') f.revisar = '';
         if (k === 'costo' && !f.precio && f.costo) { f.precio = T.neg.precioSugerido(f.costo); T.$('[data-k=precio]', tr).value = f.precio; }
       } else f[k] = e.target.value.trim();
+      T.$('[data-etq]', tr).innerHTML = etiquetas(f);
+      tr.classList.toggle('revisar', !!f.revisar);
       pintarTotal();
     };
     T.$('#filas', cu).onclick = e => { const b = e.target.closest('[data-quitar]'); if (b) { filas.splice(+b.closest('tr').dataset.i, 1); pintar(); } };
+    T.$('#avisos-ent', cu).onclick = e => {
+      if (!e.target.closest('#sugerir')) return;
+      filas.forEach(f => { if ((bajoCosto(f) || sinPrecio(f)) && f.costo > 0) f.precio = T.neg.precioSugerido(f.costo / factorDe(f)); });
+      pintar();
+    };
+    const doc = T.$('.doc-tira', cu);
+    if (doc) doc.onclick = e => { const b = e.target.closest('[data-ver]'); if (b) verArchivo(fotos[+b.dataset.ver], `Factura ${factura || ''} · hoja ${+b.dataset.ver + 1}`); };
+    const infoProv = () => {
+      const p = provDe(), nom = T.$('#prov', cu).value.trim();
+      T.$('#prov-info', cu).textContent = !nom ? '' : p ? `Proveedor registrado: ${p.nombre}${p.nit ? ' · NIT ' + p.nit : ''}` : `Proveedor nuevo: se crea al subir${nit ? ' · NIT ' + nit : ''}`;
+    };
+    T.$('#prov', cu).oninput = infoProv;
     T.$('#esCompra', cu).onchange = pintar;
-    T.$('#nuevo', cu).onclick = () => { filas.push({ nombre: '', codigo: '', categoria: '', unidad: 'und', cantidad: 1, costo: 0, precio: 0, candidatos: [], productoId: '' }); pintar(); };
+    T.$('#nuevo', cu).onclick = () => { filas.push({ nombre: '', codigo: '', categoria: '', unidad: 'und', cantidad: 1, costo: 0, precio: 0, candidatos: [], productoId: '' }); pintar(); const i = T.$$('#filas [data-k=nombre]', cu).pop(); if (i) i.focus(); };
     T.$('#bus', cu).oninput = e => {
       const t = T.norm(e.target.value), cod = e.target.value.trim();
       T.$('#res', cu).innerHTML = t.length < 2 ? '' : T.db.lista('productos').filter(p => p.codigo === cod || T.norm(p.nombre).includes(t)).slice(0, 8).map(p => `<button data-p="${p.id}">${T.esc(p.nombre)}</button>`).join('');
@@ -244,22 +320,27 @@
       enlazar(f, p); filas.push(f);
       T.$('#bus', cu).value = ''; T.$('#res', cu).innerHTML = ''; pintar();
     };
-    pintar();
+    pintar(); infoProv();
 
     async function guardar() {
-      const compra = T.$('#esCompra', cu).checked, nomProv = T.$('#prov', cu).value.trim();
+      const compra = T.$('#esCompra', cu).checked, nomProv = T.$('#prov', cu).value.trim(), numFac = T.$('#fac', cu).value.trim();
       if (!filas.length) throw new Error('No hay productos para guardar');
       const items = filas.map(f => {
         if (!f.productoId && !f.nombre) throw new Error('Hay un producto sin nombre');
-        return { productoId: f.productoId || null, nuevo: f.productoId ? null : { nombre: f.nombre, codigo: f.codigo || '', categoria: f.categoria || '', marca: f.marca || '', unidad: f.unidad || 'und', foto: f.foto || '' }, cantidad: T.r3((f.cantidad || 0) * factorDe(f)), costo: T.red((f.costo || 0) / factorDe(f)), precio: f.precio || 0 };
+        if (!(f.cantidad > 0)) throw new Error(`Falta la cantidad de "${f.nombre}"`);
+        if (sinPrecio(f)) throw new Error(`Falta el precio de venta de "${f.nombre}"`);
+        return { productoId: f.productoId || null, nuevo: f.productoId ? null : { nombre: f.nombre, codigo: f.codigo || '', categoria: f.categoria || '', marca: f.marca || '', unidad: f.unidad || 'und', foto: f.foto || '', iva: f.iva || 0 }, cantidad: T.r3((f.cantidad || 0) * factorDe(f)), costo: T.red((f.costo || 0) / factorDe(f)), precio: f.precio || 0 };
       });
-      let proveedorId = null;
-      if (compra && nomProv) {
-        const p = T.db.lista('proveedores').find(x => T.norm(x.nombre) === T.norm(nomProv)) || await T.neg.guardarProveedor({ nombre: nomProv });
-        proveedorId = p.id;
+      let prov = compra && nomProv ? provDe() : null;
+      // Una misma factura no se sube dos veces por error.
+      if (compra && numFac) {
+        const ya = (await T.db.todos('compras')).find(c => T.norm(c.factura) === T.norm(numFac) && (!prov || !c.proveedorId || c.proveedorId === prov.id) && (prov || !nomProv || T.norm(c.proveedor) === T.norm(nomProv)));
+        if (ya && !await T.confirmar(`La factura ${numFac}${ya.proveedor ? ' de ' + ya.proveedor : ''} ya se subió el ${T.fechaHora(ya.fecha)} (compra ${ya.numero}, ${T.money(ya.total)}).\n\n¿Subirla otra vez? Las existencias se sumarían de nuevo.`, { titulo: 'Factura repetida', ok: 'Sí, subir otra vez', peligro: true })) return false;
       }
-      const r = await T.neg.entrada({ items, esCompra: compra, proveedorId, factura: T.$('#fac', cu).value.trim(), pago: T.$('#pago', cu).value, origen });
-      T.toast(`Guardado: ${r.productos} producto(s)${r.nuevos ? `, ${r.nuevos} nuevo(s)` : ''}`, 'ok');
+      if (compra && nomProv && !prov) prov = await T.neg.guardarProveedor({ nombre: nomProv, nit: nit || '', telefono: telefono || '' });
+      const r = await T.neg.entrada({ items, esCompra: compra, proveedorId: prov ? prov.id : null, factura: numFac, pago: T.$('#pago', cu).value, origen, nota: fechaFactura ? 'Factura del ' + T.fechaCorta(fechaFactura) : '' });
+      if (deFactura) await T.db.setLoc(BORRADOR, null);
+      T.toast(`Subido al inventario: ${r.productos} producto(s)${r.nuevos ? `, ${r.nuevos} nuevo(s)` : ''}${r.compra ? ` · compra ${r.compra.numero}` : ''}`, 'ok');
       T.app.refrescar();
       return r;
     }
@@ -299,18 +380,21 @@
       const editar = T.auth.puede('inventario.editar'), verCosto = T.auth.puede('utilidad.ver'), hoy = T.dia(), lim = T.dia(Date.now() + T.regla('diasVence') * 86400000);
       const todos = T.db.lista('productos');
       el.innerHTML = `<div class="cabeza"><h2>Inventario</h2><div class="fila">
-          ${editar && T.auth.puede('ia.usar') ? `<button class="btn ia" id="foto">${T.ico('camara')} Agregar con foto</button>` : ''}
+          ${T.auth.puede('compras.crear') && T.auth.puede('ia.usar') ? `<button class="btn ia" id="factura">${T.ico('factura')} Factura con IA</button>` : ''}
+          ${editar && T.auth.puede('ia.usar') ? `<button class="btn" id="foto">${T.ico('camara')} Foto de productos</button>` : ''}
           ${editar ? `<button class="btn pri" id="nuevo">${T.ico('mas')} Producto</button><button class="btn" id="entrada">${T.ico('compras')} Entrada</button><button class="btn" id="imp">${T.ico('subir')} Importar</button>` : ''}
-          <button class="btn" id="exp">${T.ico('bajar')} Exportar</button></div></div>
+          <button class="btn" id="exp">${T.ico('bajar')} Excel (CSV)</button><button class="btn" id="pdf">${T.ico('pdf')} PDF / Imprimir</button></div></div>
         <div class="fila" style="margin-bottom:12px"><div class="buscador crece">${T.ico('buscar')}<input id="q" value="${T.esc(texto)}" placeholder="Nombre, marca o código"></div>
           <select id="filtro" style="width:auto">${[['todos', 'Todos'], ['bajos', 'Por agotarse'], ['agotados', 'Agotados'], ['vence', 'Vencidos o por vencer'], ['inactivos', 'Inactivos']].map(([v, t]) => `<option value="${v}" ${v === filtro ? 'selected' : ''}>${t}</option>`).join('')}</select>
           <select id="cat" style="width:auto"><option value="">Todas las categorías</option>${T.categorias().map(c => `<option ${c === cat ? 'selected' : ''}>${T.esc(c)}</option>`).join('')}</select></div>
         <p class="suave" id="resumen" style="margin-bottom:10px"></p><div id="tabla"></div>`;
+      let visibles = [];
       const pintar = () => {
         const pals = T.norm(texto).split(/\s+/).filter(Boolean);
         const lista = todos.filter(p => (filtro === 'inactivos' ? p.activo === false : p.activo !== false) && (!cat || p.categoria === cat) &&
           (filtro !== 'bajos' || (p.stock > 0 && p.stockMin > 0 && p.stock <= p.stockMin)) && (filtro !== 'agotados' || p.stock <= 0) && (filtro !== 'vence' || (p.vence && p.vence <= lim && p.stock > 0)) &&
           (!pals.length || p.codigo === texto.trim() || pals.every(w => T.norm(`${p.nombre} ${p.marca || ''} ${p.codigo || ''}`).includes(w)))).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+        visibles = lista;
         T.$('#resumen', el).textContent = `${lista.length} producto(s)` + (verCosto ? ` · Vale a costo ${T.money(lista.reduce((a, p) => a + Math.max(0, p.stock) * (p.costo || 0), 0))} · a precio de venta ${T.money(lista.reduce((a, p) => a + Math.max(0, p.stock) * (p.precio || 0), 0))}` : '');
         T.$('#tabla', el).innerHTML = T.tabla([
           { t: '', v: p => p.foto ? `<img class="mini-foto" src="${p.foto}" alt="" loading="lazy">` : `<span class="mini-foto ini" style="--h:${T.tono(p.categoria || p.nombre)}">${T.esc(T.iniciales(p.nombre))}</span>` },
@@ -320,14 +404,19 @@
           { t: 'Hay', cls: 'der num', v: p => `<span class="etq ${p.stock <= 0 ? 'mal' : p.stockMin > 0 && p.stock <= p.stockMin ? 'aviso' : 'ok'}">${T.cant(p.stock)} ${p.unidad !== 'und' ? p.unidad : ''}</span>` },
           { t: 'Vence', v: p => p.vence ? `<span class="etq ${p.vence < hoy ? 'mal' : p.vence <= lim ? 'aviso' : ''}">${T.fechaCorta(p.vence)}</span>` : '' },
           { t: '', cls: 'acc', v: p => `${editar ? `<button class="btn-ico" data-a="editar" data-p="${p.id}" title="Editar">${T.ico('editar')}</button>` : ''}${T.auth.puede('inventario.ajustar') ? `<button class="btn mini" data-a="ajustar" data-p="${p.id}">Ajustar</button>` : ''}<button class="btn-ico" data-a="kardex" data-p="${p.id}" title="Kárdex (movimientos)">${T.ico('lista')}</button>` }
-        ], lista.slice(0, 300), todos.length ? 'Ningún producto coincide con el filtro.' : 'El inventario está vacío. Use “Agregar con foto” o “Producto”.') + (lista.length > 300 ? `<p class="suave centro" style="margin-top:8px">Se muestran 300 de ${lista.length}. Use el buscador.</p>` : '');
+        ], lista.slice(0, 300), todos.length ? 'Ningún producto coincide con el filtro.' : 'El inventario está vacío. Use “Factura con IA”, “Foto de productos” o “Producto”.') + (lista.length > 300 ? `<p class="suave centro" style="margin-top:8px">Se muestran 300 de ${lista.length}. Use el buscador.</p>` : '');
       };
       T.$('#q', el).oninput = e => { texto = e.target.value; pintar(); };
       T.$('#filtro', el).onchange = e => { filtro = e.target.value; pintar(); };
       T.$('#cat', el).onchange = e => { cat = e.target.value; pintar(); };
       T.$('#exp', el).onclick = exportar;
+      T.$('#pdf', el).onclick = () => {
+        const f = [filtro !== 'todos' && T.$('#filtro', el).selectedOptions[0].textContent, cat, texto && `búsqueda "${texto}"`].filter(Boolean).join(' · ');
+        T.informes.inventario(visibles, f);
+      };
       const en = (id, fn) => { const b = T.$(id, el); if (b) b.onclick = fn; };
       en('#foto', () => T.ui.fotoIA('productos'));
+      en('#factura', () => T.ui.facturaIA());
       en('#nuevo', async () => { if (await T.ui.editarProducto()) T.app.refrescar(); });
       en('#entrada', () => T.ui.entrada({ esCompra: false }));
       en('#imp', importar);

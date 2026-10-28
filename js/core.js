@@ -6,7 +6,7 @@
 window.T = window.T || {};
 (function (T) {
   // Debe coincidir con version.json (ver README → "Cómo actualizar").
-  T.VERSION = '1.3.0';
+  T.VERSION = '1.4.0';
   T.vistas = {};
 
   T.$ = (s, el) => (el || document).querySelector(s);
@@ -52,6 +52,7 @@ window.T = window.T || {};
   const oyentes = {};
   T.on = (ev, fn) => { (oyentes[ev] = oyentes[ev] || []).push(fn); };
   T.emit = (ev, dato) => { (oyentes[ev] || []).forEach(fn => { try { fn(dato); } catch (e) { console.error(e); } }); };
+  document.addEventListener('wheel', e => { const a = document.activeElement; if (a && a.type === 'number' && e.target === a) a.blur(); }, { passive: true });
   T.debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
 
   // ── SHA-256 propio (crypto.subtle no existe sin HTTPS) ──
@@ -117,14 +118,20 @@ window.T = window.T || {};
     subir: '<path d="M12 16V4M7 9l5-5 5 5M4 20h16"/>',
     reloj: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
     enviar: '<path d="M4 12l16-8-6 16-3-7z"/>',
-    codigo: '<path d="M4 5v14M8 5v14M11 5v14M15 5v14M18 5v14M20.5 5v14"/>'
+    codigo: '<path d="M4 5v14M8 5v14M11 5v14M15 5v14M18 5v14M20.5 5v14"/>',
+    factura: '<path d="M6 3h9l4 4v14l-2-1.3-2 1.3-2-1.3-2 1.3-2-1.3L6 21z"/><path d="M15 3v4h4M9 11h7M9 15h7M9 7h3"/>',
+    pdf: '<path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4M9 13h6M9 17h4"/>'
   };
   T.ico = n => `<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICO[n] || ''}</svg>`;
 
   // ── Identidad visual ──
   // Logo: monograma "E" sobre el color de marca.
   T.marca = () => '<svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#e31b23"/><path d="M11 9.5v13M11 9.5h10.5M11 16h7.5M11 22.5h10.5" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-  T.iniciales = n => String(n || '?').trim().split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase();
+  // Iniciales de las dos primeras palabras con letras: "Coca-Cola 1.5 L" → "CC", no "C1".
+  T.iniciales = n => {
+    const ps = String(n || '?').trim().split(/[\s-]+/), letras = ps.filter(w => /^\p{L}/u.test(w));
+    return (letras.length ? letras : ps).slice(0, 2).map(w => w[0]).join('').toUpperCase();
+  };
   // Tono (0–359) estable para un texto: da color propio a cada categoría, producto sin foto o usuario.
   T.tono = t => { let h = 0; for (const c of String(t || '')) h = (h * 31 + c.charCodeAt(0)) % 360; return h; };
   T.corto = n => n >= 1e6 ? (n / 1e6).toFixed(n >= 1e7 ? 0 : 1).replace('.', ',') + ' M' : n >= 1000 ? Math.round(n / 1000) + ' mil' : String(Math.round(n || 0));
@@ -142,17 +149,23 @@ window.T = window.T || {};
   // ── Ventanas modales ──
   // botones: [{txt, cls, fn(cuerpo, cerrar)}]. Si fn devuelve false la ventana sigue abierta;
   // si lanza un error se muestra y la ventana sigue abierta.
-  T.modal = function ({ titulo, cuerpo, botones = [], ancho, alCerrar }) {
+  // antesDeCerrar: si devuelve false (o una promesa que da false), Cancelar / X / Esc no cierran.
+  T.modal = function ({ titulo, cuerpo, botones = [], ancho, alCerrar, antesDeCerrar, clase }) {
     const fondo = document.createElement('div');
     fondo.className = 'modal-fondo';
-    fondo.innerHTML = `<div class="modal" role="dialog" aria-modal="true" ${ancho ? `style="max-width:${ancho}px"` : ''}>
+    fondo.innerHTML = `<div class="modal ${clase || ''}" role="dialog" aria-modal="true" ${ancho ? `style="max-width:${ancho}px"` : ''}>
       <header><h3>${T.esc(titulo)}</h3><button class="btn-ico" data-cerrar aria-label="Cerrar">${T.ico('x')}</button></header>
       <div class="modal-cuerpo"></div><footer></footer></div>`;
     const cu = T.$('.modal-cuerpo', fondo), pie = T.$('footer', fondo);
     if (typeof cuerpo === 'string') cu.innerHTML = cuerpo; else if (cuerpo) cu.append(cuerpo);
-    let cerrado = false;
+    let cerrado = false, preguntando = false;
+    const salir = async () => {
+      if (preguntando) return;
+      if (antesDeCerrar) { preguntando = true; try { if (await antesDeCerrar() === false) return; } finally { preguntando = false; } }
+      cerrar(null);
+    };
     const tecla = e => {
-      if (e.key === 'Escape' && document.body.lastElementChild === fondo) { e.stopPropagation(); cerrar(null); }
+      if (e.key === 'Escape' && document.body.lastElementChild === fondo) { e.stopPropagation(); salir(); }
     };
     function cerrar(valor) {
       if (cerrado) return;
@@ -164,7 +177,7 @@ window.T = window.T || {};
       el.className = 'btn ' + (b.cls || ''); el.innerHTML = b.txt;
       if (b.id) el.dataset.id = b.id;
       el.onclick = async () => {
-        if (!b.fn) return cerrar(null);
+        if (!b.fn) return salir();
         el.disabled = true;
         try { const r = await b.fn(cu, cerrar); if (r !== false) cerrar(r); }
         catch (e) { console.error(e); T.toast(e.message || String(e), 'error'); }
@@ -173,7 +186,7 @@ window.T = window.T || {};
       pie.append(el);
     });
     if (!botones.length) pie.remove();
-    T.$('[data-cerrar]', fondo).onclick = () => cerrar(null);
+    T.$('[data-cerrar]', fondo).onclick = salir;
     document.addEventListener('keydown', tecla, true);
     document.body.append(fondo);
     const foco = T.$('[autofocus], input:not([type=hidden]):not([disabled]), select, textarea', cu);
@@ -229,7 +242,7 @@ window.T = window.T || {};
   // ── Tablas ──
   // cols: [{t: título, v: fila => html, cls}]
   T.tabla = (cols, filas, vacio = 'Sin registros') => filas.length
-    ? `<div class="tabla-caja"><table class="tabla"><thead><tr>${cols.map(c => `<th class="${c.cls || ''}">${c.t}</th>`).join('')}</tr></thead>
+    ? `<div class="tabla-caja"><table class="tabla tabla-movil"><thead><tr>${cols.map(c => `<th class="${c.cls || ''}">${c.t}</th>`).join('')}</tr></thead>
        <tbody>${filas.map(f => `<tr>${cols.map(c => `<td class="${c.cls || ''}" data-t="${T.esc(c.t)}">${c.v(f)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`
     : `<p class="vacio">${T.esc(vacio)}</p>`;
 
@@ -297,11 +310,30 @@ window.T = window.T || {};
     }
   };
 
-  // ── Impresión (recibos térmicos y reportes) ──
-  T.imprimir = html => {
+  // Archivo para la IA: las fotos se reducen; los PDF (factura electrónica) van tal cual.
+  T.leerParaIA = async (archivo, max = 1600) => {
+    if (archivo.type === 'application/pdf' || /\.pdf$/i.test(archivo.name)) {
+      if (archivo.size > 15 * 1024 * 1024) throw new Error(`El PDF "${archivo.name}" pesa más de 15 MB`);
+      return new Promise((ok, err) => {
+        const r = new FileReader();
+        r.onload = () => ok('data:application/pdf;base64,' + String(r.result).split(',')[1]);
+        r.onerror = () => err(new Error('No se pudo leer el PDF'));
+        r.readAsDataURL(archivo);
+      });
+    }
+    return T.img.leer(archivo, max, 0.85);
+  };
+  T.esPDF = d => String(d).startsWith('data:application/pdf');
+
+  // ── Impresión (recibos térmicos e informes) ──
+  // nombre: título del documento mientras se imprime; es el nombre que propone "Guardar como PDF".
+  T.imprimir = (html, nombre) => {
     let z = T.$('#impresion');
     if (!z) { z = document.createElement('div'); z.id = 'impresion'; document.body.append(z); }
     z.innerHTML = html;
+    const titulo = document.title;
+    if (nombre) document.title = nombre.replace(/[\\/:*?"<>|]+/g, '-');
+    window.addEventListener('afterprint', () => { document.title = titulo; }, { once: true });
     setTimeout(() => window.print(), 60);
   };
 })(window.T);

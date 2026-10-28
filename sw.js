@@ -2,9 +2,9 @@
 // Service worker: permite abrir la tienda sin internet.
 // Estrategia "red primero": siempre que hay conexión se usa la versión
 // más nueva de los archivos; sin conexión se usa la última guardada.
-const CACHE = 'tienda-v3';
+const CACHE = 'tienda-v4';
 const ARCHIVOS = ['./', 'index.html', 'css/app.css', 'manifest.json', 'icon.svg', 'version.json',
-  'js/core.js', 'js/db.js', 'js/reglas.js', 'js/neg.js', 'js/ia.js', 'js/sync.js', 'js/app.js',
+  'js/core.js', 'js/db.js', 'js/reglas.js', 'js/neg.js', 'js/ia.js', 'js/sync.js', 'js/informes.js', 'js/app.js',
   'js/vistas/vender.js', 'js/vistas/inventario.js', 'js/vistas/gestion.js', 'js/vistas/reportes.js', 'js/vistas/config.js'];
 
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(ARCHIVOS)).then(() => self.skipWaiting())); });

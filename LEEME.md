@@ -29,7 +29,7 @@ La primera vez pide el nombre de la tienda y crea el usuario administrador.
 | **Vender** | Buscador y lector de código de barras (USB o cámara), productos por peso, descuentos, venta en espera, pago en efectivo / Nequi / Daviplata / tarjeta / transferencia / fiado, pago mixto, cambio, recibo para impresora térmica (58 u 80 mm) y por WhatsApp. `F2` cobrar, `F4` buscar. |
 | **Inventario** | Productos con foto, código, categoría, costo, precio, IVA, mínimo y vencimiento. Kárdex por producto. Ajustes con motivo. Importar / exportar CSV. |
 | **Foto con IA** | Tome una foto de los productos o del estante y la IA propone nombre, marca, categoría, cantidad y precio, y recorta la foto de cada uno. Usted revisa y guarda. Detecta si el producto ya existe para no duplicarlo. |
-| **Factura con IA** | Tome una foto de la factura del proveedor: la IA lee productos, cantidades y costos y arma la compra. Compara el total con el de la factura. |
+| **Factura con IA** | Botón **Factura con IA** en Inicio, Inventario y Compras. Tome una foto por cada hoja de la factura o elija el **PDF de la factura electrónica**. La IA lee proveedor, NIT, número, productos, cajas y pacas (las pasa a unidades), costos con IVA y el total. Usted revisa —con la factura en grande al lado— y toca **Subir al inventario**: crea los productos nuevos, suma existencias, actualiza costos y registra la compra. Marca los renglones que no cuadran, avisa si la factura ya se había subido y guarda la lectura hasta que se suba. |
 | **Compras** | Compras a proveedores (pagada, con plata de la caja o a crédito), cuentas por pagar, costo promedio. Se pueden digitar por paca o caja. |
 | **Pedido sugerido** | Compras → Pedido sugerido: qué pedir a cada proveedor según lo vendido en 4 semanas y el mínimo de cada producto; se envía por WhatsApp y, cuando llega, se registra como compra con un clic. |
 | **Presentaciones** | Un producto puede venderse por unidad, six-pack, paca o caja, cada una con su precio y código. El inventario siempre se lleva en unidades. |
@@ -37,6 +37,7 @@ La primera vez pide el nombre de la tienda y crea el usuario administrador.
 | **Clientes y fiados** | Cupo por cliente, cuenta detallada, abonos, cobro por WhatsApp. |
 | **Caja** | Apertura con base, gastos, ingresos, retiros, cierre con arqueo (faltante / sobrante) e impresión del cierre. |
 | **Reportes** | Ventas, utilidad, medios de pago, categorías, vendedores, productos más vendidos; anular ventas; exportar. |
+| **Informes en PDF** | Botones **PDF / Imprimir**: informe de ventas (Reportes), inventario valorizado (Inventario), estado de cuenta (cuenta de cada cliente), cartera (Clientes) y compras. Salen en hoja carta con el encabezado de la tienda; en la ventana de impresión elija la impresora o **Guardar como PDF**. |
 | **Asistente IA** | Preguntas en lenguaje normal sobre el negocio ("¿qué debo pedir?", "¿qué no se vende?"). |
 | **Bitácora** | Registro de todo lo que hace cada usuario, con verificación de integridad. |
 
@@ -145,6 +146,7 @@ js/reglas.js         permisos, reglas del negocio, usuarios y sesión
 js/neg.js            ventas, kárdex, compras, fiados, caja (toda la lógica)
 js/ia.js             Gemini: fotos de productos, facturas y asistente
 js/sync.js           copia al servidor de la tienda, a la nube y respaldos
+js/informes.js       informes en hoja carta para imprimir o guardar en PDF
 js/vistas/*.js       pantallas
 js/app.js            arranque, entrada, menú, tablero, actualizaciones
 firestore.rules      reglas de seguridad de la nube

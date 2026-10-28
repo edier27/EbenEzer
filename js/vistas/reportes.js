@@ -61,12 +61,13 @@
   };
 
   T.vistas.reportes = {
-    desde: T.dia(), hasta: T.dia(), pestana: 'resumen',
+    desde: T.dia(), hasta: T.dia(), pestana: 'resumen', _dia: T.dia(),
     async render(el) {
       const hoy = T.dia(), util = T.auth.puede('utilidad.ver');
+      if (this._dia !== hoy) { this.desde = this.hasta = this._dia = hoy; }   // el programa siguió abierto de un día para otro
       const r = await T.neg.resumen(T.iniDia(this.desde), T.finDia(this.hasta));
       const rapidos = [['Hoy', hoy, hoy], ['Ayer', T.dia(Date.now() - 86400000), T.dia(Date.now() - 86400000)], ['7 días', T.dia(Date.now() - 6 * 86400000), hoy], ['Este mes', hoy.slice(0, 8) + '01', hoy], ['30 días', T.dia(Date.now() - 29 * 86400000), hoy]];
-      el.innerHTML = `<div class="cabeza"><h2>Reportes</h2><div class="fila"><button class="btn" id="csv">${T.ico('bajar')} Exportar ventas</button><button class="btn" id="imp">${T.ico('imprimir')} Imprimir</button></div></div>
+      el.innerHTML = `<div class="cabeza"><h2>Reportes</h2><div class="fila"><button class="btn" id="csv">${T.ico('bajar')} Exportar ventas</button><button class="btn pri" id="imp">${T.ico('pdf')} PDF / Imprimir</button></div></div>
         <div class="fila" style="margin-bottom:12px"><div class="chips" style="padding:0">${rapidos.map(([t, d, h], i) => `<button data-r="${i}" class="${d === this.desde && h === this.hasta ? 'activo' : ''}">${t}</button>`).join('')}</div>
           <input type="date" id="desde" value="${this.desde}" style="width:auto" aria-label="Desde"><input type="date" id="hasta" value="${this.hasta}" style="width:auto" aria-label="Hasta"></div>
         <div class="pestanas" id="pes">${[['resumen', 'Resumen'], ['ventas', `Ventas (${r.ventas.length})`], ['productos', 'Productos']].map(([id, t]) => `<button data-t="${id}" class="${id === this.pestana ? 'activo' : ''}">${t}</button>`).join('')}</div><div id="cont"></div>`;
@@ -99,7 +100,14 @@
       T.$('#hasta', el).onchange = e => { if (e.target.value) { this.hasta = e.target.value; if (this.hasta < this.desde) this.desde = this.hasta; this.render(el); } };
       T.$('#csv', el).onclick = () => T.descargar(`ventas-${this.desde}_${this.hasta}.csv`, T.csv([['recibo', 'fecha', 'vendedor', 'cliente', 'producto', 'cantidad', 'precio', 'descuento', 'total', 'pago', 'estado'],
       ...r.ventas.flatMap(v => v.items.map(l => [v.numero, T.fechaHora(v.fecha), v.usuario, v.cliente, l.nombre, l.cantidad, l.precio, l.descuento, l.total, v.pagos.map(p => p.metodo).join('+'), v.estado]))]), 'text/csv');
-      T.$('#imp', el).onclick = () => T.imprimir(`<h2>${T.esc(T.db.cfg('negocio', {}).nombre || '')} — Reporte ${T.fechaCorta(this.desde)} a ${T.fechaCorta(this.hasta)}</h2>${cont.innerHTML}`);
+      T.$('#imp', el).onclick = async () => {
+        const v = await T.pedir({
+          titulo: 'Informe de ventas', ok: `${T.ico('pdf')} Generar`, ancho: 440,
+          nota: `${T.fechaCorta(this.desde)}${this.desde === this.hasta ? '' : ' al ' + T.fechaCorta(this.hasta)}. En la ventana que se abre elija la impresora o "Guardar como PDF".`,
+          campos: [{ id: 'recibos', label: 'Incluir la lista de todos los recibos', tipo: 'check', valor: r.ventas.length <= 60, ayuda: `${r.ventas.length} recibo(s) en este periodo` }]
+        });
+        if (v) T.informes.ventas(this.desde, this.hasta, v);
+      };
     }
   };
 
@@ -140,8 +148,9 @@
   const detalle = d => d == null ? '' : typeof d !== 'object' ? String(d) : Object.entries(d).map(([k, v]) => `${k}: ${esCambio(k, v) ? `${v[0] ?? '—'} → ${v[1] ?? '—'}` : v !== null && typeof v === 'object' ? JSON.stringify(v) : v}`).join(' · ');
 
   T.vistas.auditoria = {
-    desde: T.dia(), hasta: T.dia(), q: '',
+    desde: T.dia(), hasta: T.dia(), q: '', _dia: T.dia(),
     async render(el) {
+      if (this._dia !== T.dia()) { this.desde = this.hasta = this._dia = T.dia(); }
       const regs = (await T.db.rango('auditoria', 'fecha', T.iniDia(this.desde), T.finDia(this.hasta))).sort((a, b) => b.fecha - a.fecha);
       el.innerHTML = `<div class="cabeza"><div><h2>Bitácora</h2><span class="suave">Todo lo que se hace queda aquí. No se puede editar ni borrar.</span></div>
           <div class="fila"><button class="btn" id="ver">${T.ico('auditoria')} Verificar integridad</button><button class="btn" id="csv">${T.ico('bajar')} Exportar</button></div></div>
