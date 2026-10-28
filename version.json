@@ -1,7 +1,8 @@
 {
-  "version": "1.4.4",
+  "version": "1.4.5",
   "fecha": "2026-10-28",
   "notas": [
+    "\"Tomar foto\" abre la cámara también en el computador (cámara web con vista previa); en el celular abre la cámara del teléfono. Para facturas se pueden tomar varias hojas seguidas.",
     "Pantalla de entrada: \"Olvidé mi clave\" (se recupera con el correo y la clave de la nube) y \"Entrar con la nube\" para traer los datos o crear la cuenta.",
     "Todo debe quedar en Firebase: si un equipo no tiene la nube conectada, la barra de arriba se pone en rojo y Inicio avisa, con un botón para conectarla en un paso. Aviso si el programa se abrió como archivo.",
     "Lo fiado ya no cuenta como venta: las ventas son el dinero que entra (contado + abonos de fiados) y lo fiado se muestra aparte como \"por cobrar\", en Inicio, Caja, Reportes, cierres e informes.",

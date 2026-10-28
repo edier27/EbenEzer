@@ -44,7 +44,7 @@
     const m = T.modal({
       titulo: p ? 'Editar producto' : 'Producto nuevo', ancho: 600, alCerrar: v => res(v || null),
       cuerpo: `<div class="fila" style="margin-bottom:12px"><img class="mini-foto" id="foto" style="width:72px;height:72px" src="${foto}" alt="">
-          <button class="btn mini" id="cambiar-foto">${T.ico('camara')} Foto</button>
+          <button class="btn mini" id="cambiar-foto">${T.ico('camara')} Tomar foto</button>
           ${T.auth.puede('ia.usar') ? `<button class="btn mini ia" id="ia-foto">${T.ico('ia')} Llenar con foto (IA)</button>` : ''}</div>
         ${T.form(campos)}<datalist id="dl-cat">${T.categorias().map(c => `<option value="${T.esc(c)}">`).join('')}</datalist>
         ${p ? `<p class="suave" style="margin-top:10px">Existencias: <b>${T.cant(p.stock)}</b>. Para cambiarlas use “Ajustar” o registre una compra: así queda el rastro.</p>` : ''}
@@ -74,10 +74,10 @@
     T.$('#pres', cu).onclick = e => { const b = e.target.closest('[data-quitar]'); if (b) { pres.splice(+b.closest('tr').dataset.i, 1); pintarPres(); } };
     T.$('#mas-pres', cu).onclick = () => { pres.push({ nombre: '', factor: '', precio: '', codigo: '' }); pintarPres(); const u = T.$$('#pres [data-k=nombre]', cu).pop(); if (u) u.focus(); };
     pintarPres();
-    T.$('#cambiar-foto', cu).onclick = async () => { const [f] = await T.elegirArchivo('image/*'); if (f) ponerFoto(await T.img.miniatura(await T.img.leer(f, 640))); };
+    T.$('#cambiar-foto', cu).onclick = async () => { const [f] = await T.tomarFoto(); if (f) ponerFoto(await T.img.miniatura(await T.img.leer(f, 640))); };
     const ia = T.$('#ia-foto', cu);
     if (ia) ia.onclick = async () => {
-      const [f] = await T.elegirArchivo('image/*'); if (!f) return;
+      const [f] = await T.tomarFoto(); if (!f) return;
       ia.disabled = true; ia.textContent = 'Analizando…';
       try {
         const img = await T.img.leer(f), [x] = await T.ia.productosDeFotos([img]);
@@ -155,7 +155,7 @@
       if (e.target.closest('#retomar')) { const d = T.db.loc(BORRADOR); m.cerrar(); if (d) T.ui.entrada(d); }
       if (e.target.closest('#descartar') && await T.confirmar('¿Descartar la factura leída? Tendría que volver a leerla con la IA.', { ok: 'Descartar', peligro: true })) { await T.db.setLoc(BORRADOR, null); pintar(); }
     };
-    T.$('#tomar', cu).onclick = async () => sumar(await T.elegirArchivo('image/*', { camara: true }));
+    T.$('#tomar', cu).onclick = async () => sumar(await T.tomarFoto({ multiple: modo === 'factura' }));
     T.$('#elegir', cu).onclick = async () => sumar(await T.elegirArchivo(modo === 'factura' ? 'image/*,application/pdf,.pdf' : 'image/*', { multiple: true }));
     pintar();
 

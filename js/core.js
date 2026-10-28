@@ -6,7 +6,7 @@
 window.T = window.T || {};
 (function (T) {
   // Debe coincidir con version.json (ver README → "Cómo actualizar").
-  T.VERSION = '1.4.4';
+  T.VERSION = '1.4.5';
   T.vistas = {};
 
   T.$ = (s, el) => (el || document).querySelector(s);
@@ -278,6 +278,76 @@ window.T = window.T || {};
     i.onchange = () => res(Array.from(i.files));
     i.click();
   });
+
+  // ── Cámara ──
+  // En el celular abre la cámara del teléfono. En el computador abre la cámara web con vista previa
+  // y botón para tomar la foto (si no hay cámara o no dan permiso, deja elegir una foto guardada).
+  // Devuelve una lista de archivos (vacía si se cancela). multiple: varias fotos seguidas (hojas de una factura).
+  const esCelular = () => /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+  T.tomarFoto = ({ multiple = false } = {}) => {
+    if (esCelular() || !(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)) return T.elegirArchivo('image/*', { camara: true });
+    return new Promise(res => {
+      const tomadas = [];
+      let flujo = null, camaras = [], idx = 0;
+      const apagar = () => { if (flujo) flujo.getTracks().forEach(t => t.stop()); flujo = null; };
+      const m = T.modal({
+        titulo: multiple ? 'Tomar fotos' : 'Tomar foto', ancho: 780, clase: 'modal-camara', alCerrar: v => { apagar(); document.removeEventListener('keydown', tecla); res(v || []); },
+        cuerpo: `<div class="camara"><video playsinline muted autoplay></video><span class="camara-flash"></span>
+            <div class="camara-msj" id="cam-msj"><div class="pensando">Abriendo la cámara…</div></div></div>
+          <div class="camara-tira" id="cam-tira"></div>`,
+        botones: [
+          { txt: `${T.ico('subir')} Elegir del equipo`, cls: 'sec', fn: async (cu, cerrar) => { const fs = await T.elegirArchivo('image/*', { multiple }); if (fs.length) cerrar([...tomadas, ...fs]); return false; } },
+          { txt: 'Cambiar cámara', cls: 'sec oculto', id: 'cambiar', fn: async () => { idx = (idx + 1) % camaras.length; await abrir(); return false; } },
+          ...(multiple ? [{ txt: 'Listo', cls: 'sec oculto', id: 'listo', fn: () => tomadas }] : []),
+          { txt: `${T.ico('camara')} Tomar foto`, cls: 'pri grande', id: 'disparar', fn: () => disparar() }
+        ]
+      });
+      const boton = id => T.$(`[data-id=${id}]`, m.el), video = T.$('video', m.el), msj = T.$('#cam-msj', m.el);
+      boton('disparar').disabled = true;
+      async function abrir() {
+        apagar();
+        const tam = { width: { ideal: 1920 }, height: { ideal: 1080 } };
+        try {
+          flujo = await navigator.mediaDevices.getUserMedia({ audio: false, video: camaras[idx] ? { deviceId: { exact: camaras[idx].deviceId }, ...tam } : { facingMode: 'environment', ...tam } });
+          video.srcObject = flujo; await video.play().catch(() => { });
+          msj.classList.add('oculto');
+          if (!camaras.length) {
+            camaras = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'videoinput');
+            const act = flujo.getVideoTracks()[0].getSettings().deviceId;
+            idx = Math.max(0, camaras.findIndex(c => c.deviceId === act));
+          }
+          boton('cambiar').classList.toggle('oculto', camaras.length < 2);
+          boton('disparar').disabled = false;
+        } catch (e) {
+          const t = e.name === 'NotAllowedError' || e.name === 'SecurityError' ? 'El navegador no dio permiso para usar la cámara. Toque el candado al lado de la dirección, permita la cámara y abra esta ventana otra vez.'
+            : e.name === 'NotFoundError' || e.name === 'OverconstrainedError' ? 'No se encontró una cámara en este equipo.'
+              : e.name === 'NotReadableError' ? 'La cámara la está usando otro programa (por ejemplo una videollamada). Ciérrelo y abra esta ventana otra vez.'
+                : 'No se pudo abrir la cámara: ' + e.message;
+          msj.classList.remove('oculto');
+          msj.innerHTML = `${T.ico('camara')}<p>${T.esc(t)}</p><p class="suave">También puede usar una foto guardada con “Elegir del equipo”.</p>`;
+          boton('disparar').disabled = true;
+        }
+      }
+      async function disparar() {
+        if (!flujo || !video.videoWidth) throw new Error('La cámara todavía no está lista');
+        const c = document.createElement('canvas');
+        c.width = video.videoWidth; c.height = video.videoHeight;
+        c.getContext('2d').drawImage(video, 0, 0);
+        const blob = await new Promise(ok => c.toBlob(ok, 'image/jpeg', 0.92));
+        const f = new File([blob], `foto-${Date.now()}.jpg`, { type: 'image/jpeg' });
+        const flash = T.$('.camara-flash', m.el); flash.classList.remove('on'); void flash.offsetWidth; flash.classList.add('on');
+        if (!multiple) return [f];
+        tomadas.push(f);
+        T.$('#cam-tira', m.el).innerHTML = tomadas.map((x, i) => `<img src="${URL.createObjectURL(x)}" alt="Foto ${i + 1}">`).join('') + `<span>${tomadas.length} foto(s). Tome la siguiente hoja o toque “Listo”.</span>`;
+        boton('listo').classList.remove('oculto'); boton('listo').textContent = `Listo (${tomadas.length})`;
+        return false;
+      }
+      // Espacio o Enter también toman la foto.
+      function tecla(e) { if ((e.key === ' ' || e.key === 'Enter') && e.target.tagName !== 'BUTTON' && document.body.lastElementChild === m.el) { e.preventDefault(); boton('disparar').click(); } }
+      document.addEventListener('keydown', tecla);
+      abrir();
+    });
+  };
 
   // ── Imágenes: se reducen antes de guardar o enviar a la IA ──
   T.img = {
