@@ -78,6 +78,10 @@ no vender bajo el costo, descuento máximo sin autorización, cupo de fiado, red
 costo promedio, ganancia sugerida, días de aviso de vencimiento, cierre de sesión por inactividad,
 intentos de clave.
 
+**Varias tiendas en un mismo equipo:** en la entrada, **Crear cuenta nueva** abre otra tienda con su propio
+código de activación, usuarios, inventario y cuenta de la nube. **Cambiar de tienda** pasa de una a otra.
+Ninguna se borra al cambiar.
+
 **¿Olvidó la clave?** En la pantalla de entrada toque **Olvidé mi clave**: con el correo y la clave de la nube
 de la tienda se pone una clave nueva (queda anotado en la bitácora). Si tampoco recuerda la clave de la nube,
 ahí mismo se pide un enlace al correo. Sin nube conectada, la clave la cambia otro administrador en Configuración → Usuarios.

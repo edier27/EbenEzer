@@ -23,6 +23,24 @@
         <footer>Versión ${T.VERSION}${T.licencia && T.db.lista('usuarios').length ? ' · ' + T.esc(T.licencia.resumen()) : ''}</footer></aside>
       <main class="portada-form"><div class="portada-caja">${cuerpo}</div></main></div>`;
 
+  // ── Crear cuenta / cambiar de tienda (varias tiendas en un mismo equipo) ──
+  const botonesTiendas = () => `<div class="enlaces enlaces-tienda"><button class="btn" id="cuenta-nueva">${T.ico('mas')} Crear cuenta nueva</button>${T.tiendas.lista().length > 1 ? `<button class="btn" id="cambiar-tienda">${T.ico('inicio')} Cambiar de tienda</button>` : ''}</div>`;
+  const enlazarTiendas = () => {
+    T.$('#cuenta-nueva').onclick = async () => {
+      if (await T.confirmar(`Se abre una tienda nueva en este equipo, con su propio código de activación, usuarios, inventario y nube.\n\n${negocio().nombre || 'La tienda actual'} no se borra: puede volver a ella con "Cambiar de tienda".`, { titulo: 'Crear cuenta nueva', ok: 'Crear cuenta nueva' })) T.tiendas.nueva();
+    };
+    const c = T.$('#cambiar-tienda'); if (c) c.onclick = () => elegirTienda();
+  };
+  function elegirTienda(soloOtras) {
+    const act = T.tiendas.actual(), l = T.tiendas.lista().filter(t => !soloOtras || t.id !== act);
+    const m = T.modal({
+      titulo: 'Cambiar de tienda', ancho: 420,
+      cuerpo: `<p class="suave" style="margin-bottom:10px">Tiendas guardadas en este equipo. Cada una tiene sus propios datos.</p>
+        <div class="metodos lista-pres" style="grid-template-columns:1fr">${l.map(t => `<button data-tienda="${T.esc(t.id)}" class="${t.id === act ? 'activo' : ''}"><span>${T.esc(t.nombre || 'Tienda sin nombre')}</span><small>${t.id === act ? 'abierta' : ''}</small></button>`).join('')}</div>`
+    });
+    m.cuerpo.onclick = e => { const b = e.target.closest('[data-tienda]'); if (b) { if (b.dataset.tienda === act) m.cerrar(); else T.tiendas.abrir(b.dataset.tienda); } };
+  }
+
   // Cambios de datos entre versiones. Para una versión nueva que necesite
   // transformar datos, agregue aquí { n: 2, fn: async () => {...} } — se ejecuta una sola vez.
   const MIGRACIONES = [];
@@ -40,6 +58,7 @@
         tema();
         for (const m of MIGRACIONES) if (T.db.loc('migracion', 0) < m.n) { await m.fn(); await T.db.setLoc('migracion', m.n); }
         await T.sync.iniciar();   // si hay servidor de tienda, trae usuarios y datos antes de pedir la clave
+        T.tiendas.nombrar(negocio().nombre);
         if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(() => { });
         this.entrada();
         this.buscarActualizacion();
@@ -80,7 +99,10 @@
         ${T.form(camposLic)}
         <div id="crear-estado"></div>
         <button class="btn pri grande" id="crear" style="width:100%;margin-top:18px">Activar y crear la tienda</button>
-        <div class="enlaces"><button class="btn" id="de-nube">${T.ico('nube')} Ya tengo la tienda en la nube</button><button class="btn" id="restaurar">${T.ico('subir')} Tengo un respaldo</button></div>`);
+        <div class="enlaces"><button class="btn" id="de-nube">${T.ico('nube')} Ya tengo la tienda en la nube</button><button class="btn" id="restaurar">${T.ico('subir')} Tengo un respaldo</button></div>
+        ${T.tiendas.lista().some(t => t.id !== T.tiendas.actual()) ? `<div class="enlaces"><button class="btn" id="volver-tienda">${T.ico('salir')} Volver a otra tienda de este equipo</button></div>` : ''}`);
+      const volver = T.$('#volver-tienda');
+      if (volver) volver.onclick = () => { T.tiendas.olvidar(T.tiendas.actual()); elegirTienda(true); };
       T.$('#crear').onclick = async () => {
         const btn = T.$('#crear'), est = T.$('#crear-estado');
         try {
@@ -93,6 +115,7 @@
           const u = await T.auth.guardarUsuario({ nombre: v.nombre, usuario: v.usuario, pin: v.pin, rol: 'admin' });
           await T.auth.iniciar(u.id, v.pin);
           await T.registrar('tienda.crear', v.negocio);
+          T.tiendas.nombrar(v.negocio);
           this.armar();
           T.toast(`Tienda activada: ${T.licencia.resumen()}`, 'ok');
           // Con el mismo correo y clave se conecta la nube: desde ya todo queda en Firebase.
@@ -137,7 +160,9 @@
         <p class="suave" style="margin-top:8px;font-size:.86rem">Use el correo y la clave de la nube de la tienda. Si es la primera vez, se crea la cuenta con esos datos.</p>
         <div id="act-estado"></div>
         <button class="btn pri grande" id="activar" style="width:100%;margin-top:16px">${T.ico('ok')} Activar</button>
-        <div class="enlaces"><button class="btn" id="act-nube">${T.ico('nube')} Ya la activé en otro equipo</button></div>`);
+        <div class="enlaces"><button class="btn" id="act-nube">${T.ico('nube')} Ya la activé en otro equipo</button></div>
+        ${botonesTiendas()}`);
+      enlazarTiendas();
       const btn = T.$('#activar'), est = T.$('#act-estado');
       const ir = async () => {
         try {
@@ -170,7 +195,9 @@
         <div class="usuarios-login">${us.map(u => `<button data-u="${u.id}" class="${u.id === sel ? 'activo' : ''}"><i class="avatar" style="--h:${T.tono(u.nombre)}">${T.esc(T.iniciales(u.nombre))}</i><span>${T.esc(u.nombre)}<small>${T.esc(T.roles()[u.rol].nombre)}</small></span></button>`).join('')}</div>
         <label class="campo"><span>Clave</span><input type="password" id="pin" autocomplete="off"></label>
         <button class="btn pri grande" id="entrar" style="width:100%;margin-top:16px">Entrar</button>
-        <div class="enlaces"><button class="btn" id="olvide">${T.ico('reloj')} Olvidé mi clave</button><button class="btn" id="login-nube">${T.ico('nube')} Entrar con la nube</button></div>`);
+        <div class="enlaces"><button class="btn" id="olvide">${T.ico('reloj')} Olvidé mi clave</button><button class="btn" id="login-nube">${T.ico('nube')} Entrar con la nube</button></div>
+        ${botonesTiendas()}`);
+      enlazarTiendas();
       const pin = T.$('#pin');
       let fallos = 0;
       T.$('#olvide').onclick = async () => { if (await T.ui.recuperarClave(sel)) pin.focus(); };

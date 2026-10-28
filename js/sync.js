@@ -15,7 +15,7 @@
 // ════════════════════════════════════════════════════════════════════
 (function (T) {
   const D = () => T.db;
-  let ocupado = false, hub = false, fb = null, fbUsuario = null, fbEscucha = null, ultNube = 0, fbListo = false;
+  let vinculando = false, ocupado = false, hub = false, fb = null, fbUsuario = null, fbEscucha = null, ultNube = 0, fbListo = false;
 
   function estado(e, detalle) { T.sync.estado = e; T.sync.detalle = detalle || ''; T.emit('sync', e); }
 
@@ -115,12 +115,19 @@
   }
   async function fbArrancar() {
     if (!window.firebase) for (const m of ['app', 'auth', 'firestore']) await cargar(`https://www.gstatic.com/firebasejs/${FB_VER}/firebase-${m}-compat.js`);
-    fb = firebase.apps.length ? firebase.app() : firebase.initializeApp(cfgNube());
+    // Cada tienda del equipo usa su propia "app" de Firebase: así cada una guarda su propia sesión
+    // y los datos de una nunca se suben a la cuenta de otra.
+    const nombre = T.tiendas.actual() ? 'tienda-' + T.tiendas.actual() : '[DEFAULT]';
+    fb = firebase.apps.find(a => a.name === nombre) || (nombre === '[DEFAULT]' ? firebase.initializeApp(cfgNube()) : firebase.initializeApp(cfgNube(), nombre));
     fb.auth().onAuthStateChanged(async u => {
       fbUsuario = u; fbListo = true;
       if (fbEscucha) { fbEscucha(); fbEscucha = null; }
       if (!u) return T.emit('sync');
-      if (D().loc('nubeUid') !== u.uid) { await D().setLoc('nubeUid', u.uid); await D().setLoc('nubeCursor', null); await D().encolarTodo(); }
+      if (D().loc('nubeUid') !== u.uid) {
+        // Una cuenta distinta solo se une a esta tienda si alguien entró a propósito (Conectar la nube).
+        if (!vinculando) { fbUsuario = null; fb.auth().signOut().catch(() => { }); return T.emit('sync'); }
+        await D().setLoc('nubeUid', u.uid); await D().setLoc('nubeCursor', null); await D().encolarTodo();
+      }
       fbEscuchar();
       T.sync.ahora();
     });
@@ -222,9 +229,12 @@
     async entrarNube(correo, clave, crear) {
       if (!correo || !clave) throw new Error('Escriba el correo y la clave');
       await fbIniciar();
-      try { await (crear ? fb.auth().createUserWithEmailAndPassword(correo, clave) : fb.auth().signInWithEmailAndPassword(correo, clave)); }
-      catch (e) { throw errNube(e); }
-      for (let i = 0; i < 30 && !fbUsuario; i++) await new Promise(r => setTimeout(r, 100));   // espera a que la sesión quede activa
+      vinculando = true;
+      try {
+        try { await (crear ? fb.auth().createUserWithEmailAndPassword(correo, clave) : fb.auth().signInWithEmailAndPassword(correo, clave)); }
+        catch (e) { throw errNube(e); }
+        for (let i = 0; i < 30 && !fbUsuario; i++) await new Promise(r => setTimeout(r, 100));   // espera a que la sesión quede activa
+      } finally { setTimeout(() => { vinculando = false; }, 3000); }
       await T.registrar('nube.entrar', correo);
     },
     // Comprueba un correo y clave de la nube SIN tocar la sesión de este equipo. Devuelve el id de la cuenta.

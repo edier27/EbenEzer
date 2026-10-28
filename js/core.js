@@ -9,6 +9,38 @@ window.T = window.T || {};
   T.VERSION = '1.5.0';
   T.vistas = {};
 
+  // ── Varias tiendas en un mismo equipo ──
+  // Cada tienda tiene su propia base de datos, su sesión de la nube y su licencia.
+  // La lista (solo nombres) vive en localStorage; '' es la tienda original del equipo.
+  const LS = { get: (k, d) => { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } }, set: (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* sin almacenamiento */ } } };
+  T.tiendas = {
+    actual: () => LS.get('tienda.actual', ''),
+    lista() {
+      const l = LS.get('tienda.lista', []), a = this.actual();
+      if (!l.some(x => x.id === a)) l.push({ id: a, nombre: '' });
+      return l;
+    },
+    // Anota el nombre de la tienda abierta, para mostrarlo en "Cambiar de tienda".
+    nombrar(nombre) {
+      const l = this.lista(), x = l.find(t => t.id === this.actual());
+      if (x && nombre && x.nombre !== nombre) { x.nombre = nombre; LS.set('tienda.lista', l); }
+    },
+    abrir(id) {
+      const l = this.lista();
+      LS.set('tienda.actual', id);
+      LS.set('tienda.lista', l.filter(t => t.id === id || t.id === '' || t.nombre));   // las que quedaron a medio crear se descartan
+      try { sessionStorage.removeItem('tienda.sesion'); } catch (e) { /* nada */ }
+      location.reload();
+    },
+    nueva() {
+      const id = Math.random().toString(36).slice(2, 10), l = this.lista();
+      l.push({ id, nombre: '' }); LS.set('tienda.lista', l);
+      this.abrir(id);
+    },
+    // Quita de la lista una tienda que quedó a medio crear (sin datos).
+    olvidar(id) { LS.set('tienda.lista', LS.get('tienda.lista', []).filter(x => x.id !== id)); }
+  };
+
   T.$ = (s, el) => (el || document).querySelector(s);
   T.$$ = (s, el) => Array.from((el || document).querySelectorAll(s));
 

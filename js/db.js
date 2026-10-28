@@ -13,7 +13,8 @@
 // PARA AGREGAR TABLAS O ÍNDICES: añádalos a ESQUEMA y suba VERSION_BD.
 // ════════════════════════════════════════════════════════════════════
 (function (T) {
-  const NOMBRE = 'tienda-ebenezer', VERSION_BD = 1;
+  // La tienda original del equipo usa 'tienda-ebenezer'; las demás, 'tienda-ebenezer-<id>'.
+  const NOMBRE = 'tienda-ebenezer' + (T.tiendas.actual() ? '-' + T.tiendas.actual() : ''), VERSION_BD = 1;
   const ESQUEMA = {
     productos: [], clientes: [], proveedores: [], usuarios: [], config: [],
     cajas: ['apertura'],
