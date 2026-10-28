@@ -1,7 +1,8 @@
 {
-  "version": "1.4.1",
+  "version": "1.4.2",
   "fecha": "2026-10-28",
   "notas": [
+    "Lo fiado ya no cuenta como venta: las ventas son el dinero que entra (contado + abonos de fiados) y lo fiado se muestra aparte como \"por cobrar\", en Inicio, Caja, Reportes, cierres e informes.",
     "Al cobrar con Fiado se elige o se busca el cliente ahí mismo (por nombre, celular o cédula), o se crea uno nuevo.",
     "Factura con IA: tome la foto o elija el PDF de la factura electrónica; la IA lee proveedor, productos, cajas y pacas, costos e IVA, y se sube al inventario con un botón.",
     "La factura leída se puede ver en grande mientras se revisa, se marcan los renglones que no cuadran y se avisa si la misma factura ya se había subido.",

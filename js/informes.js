@@ -47,33 +47,34 @@
     // ── Ventas de un periodo ──
     async ventas(desde, hasta, { recibos = false } = {}) {
       const r = await T.neg.resumen(T.iniDia(desde), T.finDia(hasta)), util = T.auth.puede('utilidad.ver');
-      const dias = Object.keys(r.porDia).sort(), productos = Object.values(r.productos).sort((a, b) => b.total - a.total);
+      const dias = Object.keys(r.porDiaDet).sort(), productos = Object.values(r.productos).sort((a, b) => b.total - a.total);
       const ventasOk = r.ventas.filter(v => v.estado === 'completada');
       T.informe({
         titulo: 'Informe de ventas', sub: rango(desde, hasta), nombre: `Ventas ${desde}${desde === hasta ? '' : ' a ' + hasta}`,
         kpis: [
-          ['Ventas netas', T.money(r.total), `${r.n} tiquete${r.n === 1 ? '' : 's'}`],
-          ['Tiquete promedio', T.money(r.n ? r.total / r.n : 0), dias.length > 1 ? `${T.money(r.total / dias.length)} por día` : ''],
-          ...(util ? [['Utilidad bruta', T.money(r.utilidad), `${pct(r.utilidad, r.total)} de margen`], ['Gastos de caja', T.money(r.gastos), `Queda ${T.money(r.utilidad - r.gastos)}`]] : []),
-          ['Fiado', T.money(r.fiado), `Abonos recibidos ${T.money(r.abonos)}`]
+          ['Ventas (dinero recibido)', T.money(r.recibido), `Contado ${T.money(r.contado)} + abonos ${T.money(r.abonos)}`],
+          ['Fiado (por cobrar)', T.money(r.fiado), 'No suma hasta que lo paguen'],
+          ['Tiquetes', T.num(r.n), `Promedio ${T.money(r.n ? r.total / r.n : 0)}`],
+          ...(util ? [['Utilidad bruta', T.money(r.utilidad), `${pct(r.utilidad, r.total)} sobre ${T.money(r.total)} en mercancía`], ['Gastos de caja', T.money(r.gastos), `Queda ${T.money(r.utilidad - r.gastos)}`]] : [])
         ],
         secciones: [
           dias.length > 1 && {
-            titulo: 'Ventas por día', html: T.tablaInf([{ t: 'Día', v: d => esc(new Date(T.iniDia(d)).toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' })) }, { t: 'Tiquetes', cls: 'der', v: d => r.porDiaN[d] || 0 }, { t: 'Ventas', cls: 'der', v: d => T.money(r.porDia[d]) }, { t: '%', cls: 'der', v: d => pct(r.porDia[d], r.total) }],
-              dias, { totales: [`${dias.length} días`, r.n, T.money(r.total), '100%'] })
+            titulo: 'Ventas por día', html: T.tablaInf([{ t: 'Día', v: d => esc(new Date(T.iniDia(d)).toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' })) }, { t: 'Tiquetes', cls: 'der', v: d => r.porDiaDet[d].n },
+              { t: 'Contado', cls: 'der', v: d => T.money(r.porDiaDet[d].contado) }, { t: 'Abonos', cls: 'der', v: d => T.money(r.porDiaDet[d].abonos) }, { t: 'Total recibido', cls: 'der', v: d => `<b>${T.money(r.porDiaCobrado[d])}</b>` }, { t: 'Fiado', cls: 'der', v: d => T.money(r.porDiaDet[d].fiado) }],
+              dias, { totales: [`${dias.length} días`, r.n, T.money(r.contado), T.money(r.abonos), T.money(r.recibido), T.money(r.fiado)] })
           },
-          { cls: 'col', titulo: 'Por medio de pago', html: reparto('Medio', r.porMetodo, k => T.METODOS[k] || k) },
-          { cls: 'col', titulo: 'Por vendedor', html: reparto('Vendedor', r.porUsuario) },
-          { titulo: 'Por categoría', html: reparto('Categoría', r.porCategoria) },
+          { cls: 'col', titulo: 'Dinero recibido por medio', html: reparto('Medio', r.ingresosPorMetodo, k => T.METODOS[k] || k) },
+          { cls: 'col', titulo: 'Recibido por cada vendedor', html: reparto('Vendedor', r.porUsuario) },
+          { titulo: 'Por categoría (mercancía, incluye fiado)', html: reparto('Categoría', r.porCategoria) },
           {
-            titulo: `Productos vendidos (${productos.length})`, html: T.tablaInf([
+            titulo: `Productos que salieron (${productos.length}) · incluye fiado`, html: T.tablaInf([
               { t: '#', cls: 'centro', v: p => productos.indexOf(p) + 1 }, { t: 'Producto', v: p => esc(p.nombre) }, { t: 'Cantidad', cls: 'der', v: p => T.cant(p.cantidad) }, { t: 'Ventas', cls: 'der', v: p => T.money(p.total) },
               ...(util ? [{ t: 'Utilidad', cls: 'der', v: p => T.money(p.utilidad) }, { t: 'Margen', cls: 'der', v: p => pct(p.utilidad, p.total) }] : [])
             ], productos, { vacio: 'No hubo ventas en este periodo.', totales: ['', 'Total', '', T.money(r.total), ...(util ? [T.money(r.utilidad), pct(r.utilidad, r.total)] : [])] })
           },
           {
             titulo: 'Otros datos', html: T.tablaInf([{ t: 'Concepto', v: x => x[0] }, { t: 'Valor', cls: 'der', v: x => x[1] }], [
-              ['Descuentos dados', T.money(r.descuento)], ['Devoluciones', T.money(r.devuelto)], ['Ventas anuladas', `${r.anuladas}`], ['IVA incluido en las ventas', T.money(r.impuesto)]])
+              ['Mercancía que salió (contado + fiado)', T.money(r.total)], ['Descuentos dados', T.money(r.descuento)], ['Devoluciones', T.money(r.devuelto)], ['Ventas anuladas', `${r.anuladas}`], ['IVA incluido en las ventas', T.money(r.impuesto)]])
           },
           recibos && {
             titulo: `Recibos (${r.ventas.length})`, html: T.tablaInf([

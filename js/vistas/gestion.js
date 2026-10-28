@@ -186,13 +186,23 @@
       <li><span>Retiros</span><span class="num">−${T.money(r.retiro)}</span></li>
       <li><span>Devoluciones</span><span class="num">−${T.money(r.devolucion)}</span></li>
       <li><b>Efectivo que debe haber</b><b class="num">${T.money(r.esperado)}</b></li></ul>`;
-  const medios = r => `<ul class="lista-simple">${Object.entries(T.METODOS).map(([k, v]) => `<li><span>${v}</span><span class="num">${T.money(r.porMetodo[k] || 0)}</span></li>`).join('')}<li><b>Total vendido (${r.ventas} tiquetes)</b><b class="num">${T.money(r.total)}</b></li></ul>`;
+  // Lo fiado no es venta hasta que se pague: aquí se cuenta el dinero que entró (contado + abonos).
+  const recibidoDe = r => r.recibido ?? (r.total - (r.porMetodo.fiado || 0) + (r.abonos || 0));
+  const medios = r => {
+    const fiado = r.porMetodo.fiado || 0;
+    return `<ul class="lista-simple">${Object.entries(T.METODOS).filter(([k]) => k !== 'fiado').map(([k, v]) => `<li><span>${v}</span><span class="num">${T.money((r.porMetodo[k] || 0) + (r.abonosPorMetodo[k] || 0))}</span></li>`).join('')}
+      <li><b>Total recibido</b><b class="num">${T.money(recibidoDe(r))}</b></li></ul>
+      <p class="suave" style="margin-top:8px">Ventas de contado ${T.money(r.total - fiado)} + abonos de fiados ${T.money(r.abonos)} · ${r.ventas} tiquete${r.ventas === 1 ? '' : 's'} en el turno.</p>
+      ${fiado ? `<div class="banda aviso" style="margin:10px 0 0">${T.ico('clientes')}<span>Fiado en este turno: ${T.money(fiado)}. No suma a las ventas hasta que lo paguen.</span></div>` : ''}`;
+  };
 
   T.ui.verCierre = c => {
     const r = c.resumen, n = T.db.cfg('negocio', {});
     const html = `<div class="recibo" style="max-width:300px"><h5>${T.esc(n.nombre || 'Tienda')}</h5><div class="c">CIERRE DE CAJA ${T.esc(c.numero)}</div><hr>
       <div>Abrió: ${T.esc(c.usuario)} · ${T.fechaHora(c.apertura)}<br>Cerró: ${T.esc(c.cerro || '')} · ${T.fechaHora(c.cierre)}</div><hr>
-      <table>${Object.entries(T.METODOS).map(([k, v]) => `<tr><td>Ventas ${v}</td><td>${T.num(r.porMetodo[k] || 0)}</td></tr>`).join('')}<tr class="t"><td>TOTAL VENTAS</td><td>${T.num(r.total)}</td></tr><tr><td>Tiquetes / anuladas</td><td>${r.ventas} / ${r.anuladas}</td></tr></table><hr>
+      <table>${Object.entries(T.METODOS).filter(([k]) => k !== 'fiado').map(([k, v]) => `<tr><td>${v}</td><td>${T.num((r.porMetodo[k] || 0) + ((r.abonosPorMetodo || {})[k] || 0))}</td></tr>`).join('')}<tr class="t"><td>TOTAL RECIBIDO</td><td>${T.num(recibidoDe(r))}</td></tr>
+        <tr><td>&nbsp;Ventas de contado</td><td>${T.num(r.total - (r.porMetodo.fiado || 0))}</td></tr><tr><td>&nbsp;Abonos de fiados</td><td>${T.num(r.abonos || 0)}</td></tr>
+        <tr><td>Fiado (por cobrar)</td><td>${T.num(r.porMetodo.fiado || 0)}</td></tr><tr><td>Tiquetes / anuladas</td><td>${r.ventas} / ${r.anuladas}</td></tr></table><hr>
       <table><tr><td>Base</td><td>${T.num(c.base)}</td></tr>${r.efectivoAnuladas ? `<tr><td>Anuladas en otra caja</td><td>${T.num(r.efectivoAnuladas)}</td></tr>` : ''}<tr><td>Abonos efectivo</td><td>${T.num(r.abonosPorMetodo.efectivo || 0)}</td></tr><tr><td>Ingresos</td><td>${T.num(r.ingreso)}</td></tr><tr><td>Gastos</td><td>−${T.num(r.gasto)}</td></tr><tr><td>Pagos proveedores</td><td>−${T.num(r.compra)}</td></tr><tr><td>Retiros</td><td>−${T.num(r.retiro)}</td></tr><tr><td>Devoluciones</td><td>−${T.num(r.devolucion)}</td></tr>
       <tr class="t"><td>DEBE HABER</td><td>${T.num(r.esperado)}</td></tr><tr class="t"><td>CONTADO</td><td>${T.num(c.contado)}</td></tr><tr class="t"><td>${c.diferencia < 0 ? 'FALTANTE' : c.diferencia > 0 ? 'SOBRANTE' : 'CUADRADA'}</td><td>${T.num(c.diferencia)}</td></tr></table>
       ${c.nota ? `<hr><div>Nota: ${T.esc(c.nota)}</div>` : ''}<hr><div class="c">Firma: ____________________</div></div>`;
@@ -205,7 +215,7 @@
       const historial = T.db.lista('cajas').filter(c => c.estado === 'cerrada' && (verTodas || c.usuarioId === T.auth.usuario.id)).sort((a, b) => b.cierre - a.cierre).slice(0, 60);
       const tablaHist = `<h3 style="margin:22px 0 10px">Cierres anteriores</h3>` + T.tabla([
         { t: 'Turno', v: c => `<b>${T.esc(c.numero)}</b><br><small class="suave">${T.fechaHora(c.cierre)}</small>` }, { t: 'Cajero', v: c => T.esc(c.usuario) },
-        { t: 'Ventas', cls: 'der num', v: c => T.money(c.resumen.total) },
+        { t: 'Recibido', cls: 'der num', v: c => `${T.money(recibidoDe(c.resumen))}${c.resumen.porMetodo.fiado ? `<br><small class="suave">fiado ${T.money(c.resumen.porMetodo.fiado)}</small>` : ''}` },
         { t: 'Cuadre', cls: 'der', v: c => `<span class="etq ${c.diferencia === 0 ? 'ok' : c.diferencia < 0 ? 'mal' : 'aviso'}">${c.diferencia === 0 ? 'Cuadrada' : (c.diferencia < 0 ? 'Faltó ' : 'Sobró ') + T.money(Math.abs(c.diferencia))}</span>` },
         { t: '', cls: 'acc', v: c => `<button class="btn-ico" data-c="${c.id}" title="Ver cierre">${T.ico('lista')}</button>` }
       ], historial, 'Aún no hay cierres.');
@@ -218,7 +228,7 @@
         const r = await T.neg.resumenCaja(caja), ventasTurno = (await T.db.porIndice('ventas', 'cajaId', caja.id)).sort((a, b) => b.fecha - a.fecha);
         el.innerHTML = `<div class="cabeza"><div><h2>Caja ${T.esc(caja.numero)} <span class="etq ok">Abierta</span></h2><span class="suave">Abrió ${T.esc(caja.usuario)} · ${T.fechaHora(caja.apertura)}</span></div>
           <div class="fila">${T.auth.puede('caja.movimientos') ? `<button class="btn" data-m="gasto">Gasto</button><button class="btn" data-m="ingreso">Ingreso</button><button class="btn" data-m="retiro">Retiro</button>` : ''}<button class="btn pri" id="cerrar">Cerrar caja</button></div></div>
-          <div class="rejilla dos"><div class="tarjeta"><h4>Efectivo</h4>${cuadro(caja, r)}</div><div class="tarjeta"><h4>Ventas por medio de pago</h4>${medios(r)}${r.abonos ? `<p class="suave" style="margin-top:8px">Abonos de fiados recibidos: ${T.money(r.abonos)}</p>` : ''}</div></div>
+          <div class="rejilla dos"><div class="tarjeta"><h4>Efectivo</h4>${cuadro(caja, r)}</div><div class="tarjeta"><h4>Dinero recibido por medio de pago</h4>${medios(r)}</div></div>
           <h3 style="margin:8px 0 10px">Movimientos del turno</h3>${T.tabla([{ t: 'Hora', v: m => T.hora(m.fecha) }, { t: 'Tipo', v: m => `<span class="etq ${m.tipo === 'ingreso' ? 'ok' : 'aviso'}">${TIPOS_CAJA[m.tipo]}</span>` }, { t: 'Concepto', v: m => T.esc(m.concepto) }, { t: 'Valor', cls: 'der num', v: m => T.money(m.monto) }, { t: 'Usuario', v: m => T.esc(m.usuario) }], r.movs, 'Sin gastos, ingresos ni retiros en este turno.')}
           <h3 style="margin:22px 0 10px">Ventas del turno</h3><div id="ventas-turno">${T.ui.tablaVentas(ventasTurno, 'Todavía no hay ventas en este turno.')}</div>
           <div id="hist">${tablaHist}</div>`;

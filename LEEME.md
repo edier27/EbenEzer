@@ -34,6 +34,7 @@ La primera vez pide el nombre de la tienda y crea el usuario administrador.
 | **Pedido sugerido** | Compras → Pedido sugerido: qué pedir a cada proveedor según lo vendido en 4 semanas y el mínimo de cada producto; se envía por WhatsApp y, cuando llega, se registra como compra con un clic. |
 | **Presentaciones** | Un producto puede venderse por unidad, six-pack, paca o caja, cada una con su precio y código. El inventario siempre se lleva en unidades. |
 | **Devoluciones** | Desde Caja o Reportes → Devolución: el cliente devuelve algunos productos; vuelven al inventario y el dinero se descuenta primero de lo fiado y el resto sale en efectivo. |
+| **Ventas y fiado** | Lo fiado **no cuenta como venta** hasta que el cliente paga: "Ventas" es el dinero que entró (ventas de contado + abonos de fiados). Lo fiado se muestra aparte como "por cobrar". La utilidad, las categorías y los productos sí cuentan toda la mercancía que salió, incluida la fiada. |
 | **Clientes y fiados** | Cupo por cliente, cuenta detallada, abonos, cobro por WhatsApp. |
 | **Caja** | Apertura con base, gastos, ingresos, retiros, cierre con arqueo (faltante / sobrante) e impresión del cierre. |
 | **Reportes** | Ventas, utilidad, medios de pago, categorías, vendedores, productos más vendidos; anular ventas; exportar. |

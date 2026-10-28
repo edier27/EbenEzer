@@ -406,6 +406,8 @@
       }
       abonos.forEach(a => { r.abonos += a.monto; r.abonosPorMetodo[a.metodo] = (r.abonosPorMetodo[a.metodo] || 0) + a.monto; });
       movs.forEach(m => { r[m.tipo] = (r[m.tipo] || 0) + m.monto; });
+      // Lo fiado no es venta hasta que se pague: lo recibido es contado + abonos.
+      r.fiado = r.porMetodo.fiado || 0; r.contado = r.total - r.fiado; r.recibido = r.contado + r.abonos;
       r.esperado = caja.base + (r.porMetodo.efectivo || 0) + (r.efectivoAnuladas || 0) + (r.abonosPorMetodo.efectivo || 0) + r.ingreso - r.gasto - r.retiro - r.devolucion - r.compra;
       return r;
     },
@@ -475,10 +477,15 @@
       return out.sort((a, b) => (a.diasQuedan ?? 999) - (b.diasQuedan ?? 999));
     },
 
+    // Dos miradas del mismo periodo:
+    //  • Dinero: "recibido" = ventas de contado + abonos de fiados. Lo fiado NO cuenta como venta
+    //    hasta que el cliente lo paga (entonces entra como abono).
+    //  • Mercancía: "total" = todo lo que salió (incluye lo fiado); de ahí salen utilidad, categorías y productos.
     async resumen(desde, hasta) {
       const [ventas, movs, abonos] = await Promise.all([D().rango('ventas', 'fecha', desde, hasta), D().rango('cajaMovs', 'fecha', desde, hasta), D().rango('abonos', 'fecha', desde, hasta)]);
       // Todas las cifras van netas de devoluciones. Las cantidades por producto van en unidades sueltas.
-      const r = { ventas: [], n: 0, anuladas: 0, total: 0, costo: 0, descuento: 0, impuesto: 0, fiado: 0, devuelto: 0, gastos: 0, abonos: 0, porMetodo: {}, porDia: {}, porDiaN: {}, porCategoria: {}, porUsuario: {}, productos: {} };
+      const r = { ventas: [], n: 0, anuladas: 0, total: 0, costo: 0, descuento: 0, impuesto: 0, fiado: 0, devuelto: 0, gastos: 0, abonos: 0, porMetodo: {}, abonosPorMetodo: {}, porDia: {}, porDiaDet: {}, porCategoria: {}, porUsuario: {}, productos: {} };
+      const dia = d => r.porDiaDet[d] = r.porDiaDet[d] || { n: 0, contado: 0, abonos: 0, fiado: 0 };
       for (const v of ventas) {
         r.ventas.push(v);
         if (v.estado !== 'completada') { r.anuladas++; continue; }
@@ -487,8 +494,10 @@
         v.pagos.forEach(p => { r.porMetodo[p.metodo] = (r.porMetodo[p.metodo] || 0) + p.monto; });
         if (fd) r.porMetodo.fiado -= fd;
         if (dv - fd) r.porMetodo.efectivo = (r.porMetodo.efectivo || 0) - (dv - fd);   // lo devuelto en plata sale del efectivo
-        const d = T.dia(v.fecha); r.porDia[d] = (r.porDia[d] || 0) + neto; r.porDiaN[d] = (r.porDiaN[d] || 0) + 1;
-        r.porUsuario[v.usuario] = (r.porUsuario[v.usuario] || 0) + neto;
+        const d = T.dia(v.fecha), fiadoV = (v.fiado || 0) - fd, dd = dia(d);
+        r.porDia[d] = (r.porDia[d] || 0) + neto;
+        dd.n++; dd.contado += neto - fiadoV; dd.fiado += fiadoV;
+        r.porUsuario[v.usuario] = (r.porUsuario[v.usuario] || 0) + neto - fiadoV;
         for (const l of v.items) {
           const queda = T.r3(l.cantidad - (l.devuelto || 0));
           if (!(queda > 0)) continue;
@@ -499,8 +508,18 @@
         }
       }
       movs.forEach(m => { if (m.tipo === 'gasto') r.gastos += m.monto; });
-      abonos.forEach(a => { r.abonos += a.monto; });
+      abonos.forEach(a => {
+        r.abonos += a.monto; dia(T.dia(a.fecha)).abonos += a.monto;
+        r.abonosPorMetodo[a.metodo] = (r.abonosPorMetodo[a.metodo] || 0) + a.monto;
+        r.porUsuario[a.usuario] = (r.porUsuario[a.usuario] || 0) + a.monto;
+      });
       r.utilidad = r.total - r.costo;
+      r.contado = r.total - r.fiado; r.recibido = r.contado + r.abonos;
+      r.porDiaCobrado = {};
+      for (const [d, x] of Object.entries(r.porDiaDet)) r.porDiaCobrado[d] = x.contado + x.abonos;
+      // Dinero que entró por cada medio: ventas de contado + abonos (sin fiado).
+      r.ingresosPorMetodo = {};
+      for (const [k, v] of [...Object.entries(r.porMetodo), ...Object.entries(r.abonosPorMetodo)]) if (k !== 'fiado') r.ingresosPorMetodo[k] = (r.ingresosPorMetodo[k] || 0) + v;
       r.ventas.sort((a, b) => b.fecha - a.fecha);
       return r;
     }

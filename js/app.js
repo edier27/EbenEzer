@@ -235,10 +235,10 @@
     async render(el) {
       const hoy = T.dia(), fin = T.finDia(hoy), verPlata = T.auth.puede('reportes.ver'), verUtil = T.auth.puede('utilidad.ver');
       const [d, sem] = await Promise.all([T.neg.resumen(T.iniDia(hoy), fin), T.neg.resumen(T.iniDia(hoy) - 6 * 86400000, fin)]);
-      const ayer = sem.porDia[T.dia(T.iniDia(hoy) - 86400000)] || 0, cambio = ayer ? Math.round((d.total - ayer) / ayer * 100) : null;
+      const ayer = sem.porDiaCobrado[T.dia(T.iniDia(hoy) - 86400000)] || 0, cambio = ayer ? Math.round((d.recibido - ayer) / ayer * 100) : null;
       const al = T.neg.alertas(), caja = T.neg.cajaAbierta(), deben = T.db.lista('clientes').filter(c => c.saldo > 0);
       const dias = Array.from({ length: 7 }, (_, i) => T.dia(T.iniDia(hoy) - (6 - i) * 86400000));
-      const max = Math.max(1, ...dias.map(x => sem.porDia[x] || 0)), sinResp = T.respaldo.diasSin();
+      const max = Math.max(1, ...dias.map(x => sem.porDiaCobrado[x] || 0)), sinResp = T.respaldo.diasSin();
       const lista = (arr, f, vacio) => arr.length ? `<ul class="lista-simple">${arr.slice(0, 6).map(f).join('')}</ul>${arr.length > 6 ? `<small class="suave">y ${arr.length - 6} más…</small>` : ''}` : `<p class="suave">${vacio}</p>`;
       el.innerHTML = `
         <div class="cabeza"><div><h2>Resumen del día</h2><span class="suave">${new Date().toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</span></div>
@@ -246,12 +246,12 @@
         ${!T.sync.hub && !T.db.loc('nubeUid') && (sinResp === null || sinResp >= 1) ? `<div class="banda aviso">${T.ico('alerta')}<span>${sinResp === null ? 'Aún no hay ninguna copia de seguridad.' : `Hace ${sinResp} día(s) no se hace copia de seguridad.`} Los datos solo están en este navegador.</span>${T.auth.puede('respaldo.gestionar') ? '<button class="btn" id="resp">Descargar copia</button>' : ''}</div>` : ''}
         ${!caja && T.auth.puede('caja.operar') ? `<div class="banda">${T.ico('caja')}<span>La caja está cerrada.</span><a class="btn" href="#caja">Abrir caja</a></div>` : ''}
         ${verPlata ? `<div class="rejilla">
-          <div class="tarjeta kpi principal"><h4>Ventas de hoy</h4><b>${T.money(d.total)}</b><small>${cambio === null ? '' : `<span class="delta ${cambio < 0 ? 'baja' : ''}">${cambio > 0 ? '+' : ''}${cambio}% vs. ayer</span>`}${d.n} tiquete${d.n === 1 ? '' : 's'}${d.anuladas ? ` · ${d.anuladas} anulada(s)` : ''}</small></div>
-          ${verUtil ? `<div class="tarjeta kpi"><h4>Utilidad bruta hoy</h4><b>${T.money(d.utilidad)}</b><small>${d.total ? Math.round(d.utilidad / d.total * 100) : 0}% de margen</small></div>` : ''}
-          <div class="tarjeta kpi"><h4>Fiado hoy</h4><b>${T.money(d.fiado)}</b><small>Abonos recibidos: ${T.money(d.abonos)}</small></div>
+          <div class="tarjeta kpi principal"><h4>Ventas de hoy</h4><b>${T.money(d.recibido)}</b><small>${cambio === null ? '' : `<span class="delta ${cambio < 0 ? 'baja' : ''}">${cambio > 0 ? '+' : ''}${cambio}% vs. ayer</span>`}Contado ${T.money(d.contado)} + abonos ${T.money(d.abonos)}</small></div>
+          ${verUtil ? `<div class="tarjeta kpi"><h4>Utilidad bruta hoy</h4><b>${T.money(d.utilidad)}</b><small>${d.total ? Math.round(d.utilidad / d.total * 100) : 0}% de margen · ${d.n} tiquete${d.n === 1 ? '' : 's'}${d.anuladas ? `, ${d.anuladas} anulada(s)` : ''}</small></div>` : ''}
+          <div class="tarjeta kpi"><h4>Fiado hoy</h4><b>${T.money(d.fiado)}</b><small>No suma a las ventas hasta que lo paguen</small></div>
           <div class="tarjeta kpi"><h4>Por cobrar</h4><b>${T.money(deben.reduce((a, c) => a + c.saldo, 0))}</b><small>${deben.length} cliente(s)</small></div>
         </div>
-        <div class="tarjeta" style="margin-bottom:14px"><h4>Ventas de los últimos 7 días <span class="etq">${T.money(sem.total)}</span></h4><div class="barras">${dias.map(x => `<div class="${x === hoy ? 'hoy' : ''}" title="${T.money(sem.porDia[x] || 0)}"><em>${sem.porDia[x] ? T.corto(sem.porDia[x]) : ''}</em><i style="height:${Math.round((sem.porDia[x] || 0) / max * 82)}%"></i><span>${new Date(T.iniDia(x)).toLocaleDateString('es-CO', { weekday: 'short', day: 'numeric' })}</span></div>`).join('')}</div></div>` : ''}
+        <div class="tarjeta" style="margin-bottom:14px"><h4>Ventas de los últimos 7 días <span class="etq">${T.money(sem.recibido)}</span><small class="suave" style="text-transform:none;letter-spacing:0;font-weight:500;margin-left:auto">contado + abonos, sin fiado</small></h4><div class="barras">${dias.map(x => `<div class="${x === hoy ? 'hoy' : ''}" title="${T.money(sem.porDiaCobrado[x] || 0)}"><em>${sem.porDiaCobrado[x] ? T.corto(sem.porDiaCobrado[x]) : ''}</em><i style="height:${Math.round((sem.porDiaCobrado[x] || 0) / max * 82)}%"></i><span>${new Date(T.iniDia(x)).toLocaleDateString('es-CO', { weekday: 'short', day: 'numeric' })}</span></div>`).join('')}</div></div>` : ''}
         <div class="rejilla dos">
           <div class="tarjeta"><h4>Agotados y por agotarse <span class="etq ${al.agotados.length + al.bajos.length ? 'aviso' : 'ok'}">${al.agotados.length + al.bajos.length}</span></h4>
             ${lista([...al.bajos, ...al.agotados], p => `<li><span>${T.esc(p.nombre)}</span><span class="etq ${p.stock > 0 ? 'aviso' : 'mal'}">${T.cant(p.stock)}</span></li>`, 'Todo tiene existencias suficientes.')}</div>

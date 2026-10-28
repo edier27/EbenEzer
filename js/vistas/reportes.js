@@ -76,20 +76,21 @@
         return e.length ? `<ul class="lista-simple">${e.map(([k, v]) => `<li style="display:block"><div class="fila" style="justify-content:space-between"><span>${T.esc(T.METODOS[k] || k)}</span><b class="num">${fmt(v)}</b></div><div style="height:6px;border-radius:3px;background:var(--panel2);margin-top:4px"><div style="height:100%;width:${Math.round(v / max * 100)}%;background:var(--pri);border-radius:3px"></div></div></li>`).join('')}</ul>` : '<p class="suave">Sin datos en este rango.</p>';
       };
       if (this.pestana === 'resumen') {
-        const dias = Object.keys(r.porDia).sort(), max = Math.max(1, ...Object.values(r.porDia));
+        const dias = Object.keys(r.porDiaCobrado).sort(), max = Math.max(1, ...Object.values(r.porDiaCobrado));
         cont.innerHTML = `<div class="rejilla">
-            <div class="tarjeta kpi"><h4>Ventas</h4><b>${T.money(r.total)}</b><small>${r.n} tiquetes · promedio ${T.money(r.n ? r.total / r.n : 0)}</small></div>
-            ${util ? `<div class="tarjeta kpi"><h4>Utilidad bruta</h4><b>${T.money(r.utilidad)}</b><small>${r.total ? Math.round(r.utilidad / r.total * 100) : 0}% de margen</small></div>
+            <div class="tarjeta kpi principal"><h4>Ventas</h4><b>${T.money(r.recibido)}</b><small>Contado ${T.money(r.contado)} + abonos ${T.money(r.abonos)}</small></div>
+            <div class="tarjeta kpi"><h4>Fiado (por cobrar)</h4><b>${T.money(r.fiado)}</b><small>No suma a las ventas hasta que lo paguen</small></div>
+            ${util ? `<div class="tarjeta kpi"><h4>Utilidad bruta</h4><b>${T.money(r.utilidad)}</b><small>${r.total ? Math.round(r.utilidad / r.total * 100) : 0}% de margen sobre ${T.money(r.total)} en mercancía (incluye fiado)</small></div>
             <div class="tarjeta kpi"><h4>Gastos de caja</h4><b>${T.money(r.gastos)}</b><small>Queda ${T.money(r.utilidad - r.gastos)} después de gastos</small></div>` : ''}
-            <div class="tarjeta kpi"><h4>Fiado / abonos</h4><b>${T.money(r.fiado)}</b><small>Abonos recibidos ${T.money(r.abonos)}</small></div>
+            <div class="tarjeta kpi"><h4>Tiquetes</h4><b>${T.num(r.n)}</b><small>Promedio ${T.money(r.n ? r.total / r.n : 0)} por tiquete</small></div>
             <div class="tarjeta kpi"><h4>Devoluciones</h4><b>${T.money(r.devuelto)}</b><small>${r.anuladas} venta(s) anulada(s) · descuentos ${T.money(r.descuento)}${r.impuesto ? ` · IVA ${T.money(r.impuesto)}` : ''}</small></div></div>
-          ${dias.length > 1 ? `<div class="tarjeta" style="margin-bottom:14px"><h4>Ventas por día</h4><div class="barras">${dias.slice(-31).map(d => `<div title="${T.fechaCorta(d)}: ${T.money(r.porDia[d])}"><i style="height:${Math.round(r.porDia[d] / max * 100)}%"></i>${dias.length <= 14 ? `<span>${d.slice(8)}/${d.slice(5, 7)}</span>` : ''}</div>`).join('')}</div></div>` : ''}
-          <div class="rejilla dos"><div class="tarjeta"><h4>Por medio de pago</h4>${barras(r.porMetodo)}</div><div class="tarjeta"><h4>Por categoría</h4>${barras(r.porCategoria)}</div><div class="tarjeta"><h4>Por vendedor</h4>${barras(r.porUsuario)}</div></div>`;
+          ${dias.length > 1 ? `<div class="tarjeta" style="margin-bottom:14px"><h4>Ventas por día <small class="suave" style="text-transform:none;letter-spacing:0;font-weight:500">contado + abonos, sin fiado</small></h4><div class="barras">${dias.slice(-31).map(d => `<div title="${T.fechaCorta(d)}: ${T.money(r.porDiaCobrado[d])}"><i style="height:${Math.round(r.porDiaCobrado[d] / max * 100)}%"></i>${dias.length <= 14 ? `<span>${d.slice(8)}/${d.slice(5, 7)}</span>` : ''}</div>`).join('')}</div></div>` : ''}
+          <div class="rejilla dos"><div class="tarjeta"><h4>Dinero recibido por medio de pago</h4>${barras(r.ingresosPorMetodo)}</div><div class="tarjeta"><h4>Por categoría <small class="suave" style="text-transform:none;letter-spacing:0;font-weight:500">mercancía, incluye fiado</small></h4>${barras(r.porCategoria)}</div><div class="tarjeta"><h4>Por vendedor <small class="suave" style="text-transform:none;letter-spacing:0;font-weight:500">lo que recibió cada uno</small></h4>${barras(r.porUsuario)}</div></div>`;
       } else if (this.pestana === 'ventas') {
         cont.innerHTML = T.ui.tablaVentas(r.ventas.slice(0, 400), 'No hay ventas en este rango.');
         cont.onclick = e => T.ui.accionVenta(e, r.ventas, () => this.render(el));
       } else {
-        cont.innerHTML = T.tabla([
+        cont.innerHTML = '<p class="suave" style="margin-bottom:10px">Mercancía que salió en el periodo, incluida la fiada.</p>' + T.tabla([
           { t: 'Producto', v: p => T.esc(p.nombre) }, { t: 'Vendidos', cls: 'der num', v: p => T.cant(p.cantidad) }, { t: 'Ventas', cls: 'der num', v: p => T.money(p.total) },
           ...(util ? [{ t: 'Utilidad', cls: 'der num', v: p => T.money(p.utilidad) }, { t: 'Margen', cls: 'der num', v: p => (p.total ? Math.round(p.utilidad / p.total * 100) : 0) + '%' }] : [])
         ], Object.values(r.productos).sort((a, b) => b.total - a.total), 'No hay ventas en este rango.');

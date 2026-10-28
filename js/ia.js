@@ -136,11 +136,12 @@ Reglas: los números van en formato colombiano (1.500 = mil quinientos; 1.500,50
       const al = T.neg.alertas(), prods = T.db.lista('productos').filter(p => p.activo !== false);
       const top = r => Object.values(r.productos).sort((a, b) => b.total - a.total).slice(0, 25).map(p => `${p.nombre}: ${p.cantidad} und, $${p.total}, utilidad $${p.utilidad}`);
       const vendidos30 = new Set(Object.keys(d30.productos));
-      const linea = r => `ventas $${r.total} en ${r.n} tiquetes, utilidad bruta $${r.utilidad}, gastos $${r.gastos}, fiado $${r.fiado}, por medio de pago ${JSON.stringify(r.porMetodo)}`;
+      const linea = r => `ventas (dinero recibido) $${r.recibido} = contado $${r.contado} + abonos de fiados $${r.abonos}; fiado nuevo (por cobrar, no cuenta como venta) $${r.fiado}; mercancía que salió $${r.total} en ${r.n} tiquetes, utilidad bruta $${r.utilidad}, gastos $${r.gastos}, dinero por medio de pago ${JSON.stringify(r.ingresosPorMetodo)}`;
       return [
         `Negocio: ${T.db.cfg('negocio', {}).nombre || 'Tienda'}. Fecha: ${hoy}. Moneda: pesos colombianos.`,
         `HOY: ${linea(d1)}`, `ÚLTIMOS 7 DÍAS: ${linea(d7)}`, `ÚLTIMOS 30 DÍAS: ${linea(d30)}`,
-        `Ventas por día (30 días): ${JSON.stringify(d30.porDia)}`,
+        `Ventas por día, dinero recibido (30 días): ${JSON.stringify(d30.porDiaCobrado)}`,
+        'Regla de la tienda: lo fiado no es venta hasta que el cliente paga; cuando abona, ese dinero sí cuenta como venta.',
         `Ventas por categoría (30 días): ${JSON.stringify(d30.porCategoria)}`,
         `Más vendidos 30 días:\n${top(d30).join('\n')}`,
         `Inventario: ${prods.length} productos, valor a costo $${prods.reduce((a, p) => a + T.red((p.costo || 0) * Math.max(0, p.stock || 0)), 0)}.`,
