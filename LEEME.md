@@ -28,6 +28,11 @@ Cada código sirve una sola vez y queda a nombre de la cuenta (correo) que lo ac
 - **Configuración → Licencia:** muestra el tipo, cuándo vence y cuántos días quedan; ahí se escribe un código nuevo para renovar.
 - **Cuando vence:** el programa muestra "La licencia venció" y pide un código nuevo. Los datos no se tocan.
 - Faltando 7 días, Inicio avisa. La licencia viaja con la nube: los demás equipos de la tienda quedan activados solos.
+- Al activar, la cuenta de la tienda aparece en **Cuentas registradas** del panel.
+
+**Una sola vez:** el proyecto de licencias (`globalacce-37997`) necesita el permiso para la colección `ebe_users`.
+Copie el bloque de `reglas-licencias-acce.rules` y péguelo en Firebase → Firestore → Reglas de ese proyecto,
+antes de `match /{document=**}`, y toque *Publicar*. No publique ese archivo solo ni el `firestore.rules` de la tienda allá.
 
 > Si Windows pregunta por el firewall al iniciar, permita el acceso en "Redes privadas"
 > (solo hace falta para que los celulares entren).

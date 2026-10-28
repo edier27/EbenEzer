@@ -1,0 +1,33 @@
+// ════════════════════════════════════════════════════════════════════
+// BLOQUE PARA AGREGAR a las reglas del proyecto de licencias de Global ACCE
+// (Firebase: globalacce-37997 → Firestore Database → Reglas).
+//
+// NO es un archivo para publicar solo: se COPIA este bloque y se PEGA dentro
+// de las reglas que ya están publicadas en ese proyecto, justo ANTES de:
+//
+//     // Todo lo demás: DENEGADO por defecto.
+//     match /{document=**} {
+//
+// Luego se toca "Publicar". Así no se tocan las reglas de ACCE PRO ni de
+// MotoTaller. Usa las funciones isAuthed() e isAdmin() que esas reglas ya tienen.
+//
+// Qué permite (igual que motos_users):
+//   • El administrador (panel) ve, emite y borra códigos y ve las cuentas.
+//   • Cada tienda lee y escribe SOLO su ficha (documento con su uid).
+//   • Un código solo se puede leer por su nombre exacto (nadie puede listarlos).
+//   • Un código emitido por el administrador se puede marcar como usado
+//     UNA sola vez, a nombre de quien lo activa.
+// ════════════════════════════════════════════════════════════════════
+
+    // Eben-ezer (Tienda Eben-Ezer) — perfiles + códigos de licencia
+    match /ebe_users/{docId} {
+      allow read, write: if isAdmin();
+      allow get, write: if isAuthed() && docId == request.auth.uid;
+      allow get: if isAuthed() && docId.matches('code_LIC_.*');
+      allow update: if isAuthed()
+                    && docId.matches('code_LIC_.*')
+                    && resource.data.createdByAdmin == true
+                    && resource.data.used != true
+                    && request.resource.data.used == true
+                    && request.resource.data.usedBy == request.auth.uid;
+    }

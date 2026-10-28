@@ -59,7 +59,7 @@
     return { valido: false, error: 'El código no es válido. Revíselo e intente de nuevo.' };
   }
 
-  const MSJ = { 'auth/wrong-password': 'Correo o clave incorrectos', 'auth/invalid-credential': 'Correo o clave incorrectos', 'auth/invalid-login-credentials': 'Correo o clave incorrectos', 'auth/invalid-email': 'El correo no es válido', 'auth/weak-password': 'La clave debe tener mínimo 6 caracteres', 'auth/too-many-requests': 'Demasiados intentos. Espere unos minutos.', 'auth/network-request-failed': 'No hay internet', 'permission-denied': 'El servidor de licencias no permitió activar el código', 'unavailable': 'No hay conexión con el servidor de licencias' };
+  const MSJ = { 'auth/wrong-password': 'Correo o clave incorrectos', 'auth/invalid-credential': 'Correo o clave incorrectos', 'auth/invalid-login-credentials': 'Correo o clave incorrectos', 'auth/invalid-email': 'El correo no es válido', 'auth/weak-password': 'La clave debe tener mínimo 6 caracteres', 'auth/too-many-requests': 'Demasiados intentos. Espere unos minutos.', 'auth/network-request-failed': 'No hay internet', 'permission-denied': 'El servidor de licencias no permitió activar el código. Avise a su proveedor.', 'unavailable': 'No hay conexión con el servidor de licencias' };
   const err = e => new Error(MSJ[e.code] || e.message || String(e));
 
   T.licencia = {
@@ -91,13 +91,15 @@
         const auth = app.auth();
         await auth.setPersistence(firebase.auth.Auth.Persistence.NONE);
         // Cuenta de la tienda en el servidor de licencias: se crea la primera vez; si ya existe, se entra.
-        let cred;
+        let cred, nueva = true;
         try { cred = await auth.createUserWithEmailAndPassword(correo, clave); }
         catch (e) {
           if (e.code !== 'auth/email-already-in-use') throw err(e);
+          nueva = false;
           try { cred = await auth.signInWithEmailAndPassword(correo, clave); } catch (e2) { throw err(e2); }
         }
-        const uid = cred.user.uid, ref = app.firestore().collection(COLECCION).doc(docId(v.codigo));
+        // La tienda conserva el mismo identificador aunque renueve con otro código.
+        const uid = cred.user.uid, ref = app.firestore().collection(COLECCION).doc(docId(v.codigo)), clientId = (this.actual() || {}).clientId || v.clientId;
         let d;
         try { d = await ref.get(); } catch (e) { throw err(e); }
         const x = d.exists ? d.data() : null;
@@ -105,10 +107,16 @@
         if (x.used === true && x.usedBy && x.usedBy !== uid) throw new Error('Este código ya fue activado por otra cuenta. Pida un código nuevo.');
         if (x.used !== true) {
           try {
-            await ref.set({ used: true, usedBy: uid, usedByUser: correo.split('@')[0], usedAt: new Date().toISOString(), usedClientId: v.clientId, codeType: v.tipo, code: v.codigo, negocio: negocio || '' }, { merge: true });
+            await ref.set({ used: true, usedBy: uid, usedByUser: correo.split('@')[0], usedAt: new Date().toISOString(), usedClientId: clientId, codeType: v.tipo, code: v.codigo, negocio: negocio || '' }, { merge: true });
           } catch (e) { throw err(e); }
         }
-        return { codigo: v.codigo, tipo: v.tipo, vence: v.vence, correo, cuenta: uid, activada: Date.now() };
+        // Ficha de la cuenta para "Cuentas registradas" del panel (si falla, la activación igual vale).
+        const ahora = new Date().toISOString();
+        await app.firestore().collection(COLECCION).doc(uid).set({
+          uid, email: correo, username: correo.split('@')[0], clientId, licenseCode: v.codigo, licenseType: v.tipo,
+          negocio: negocio || '', app: 'Tienda Eben-Ezer', actualizadoEn: ahora, ...(nueva ? { createdAt: ahora } : {})
+        }, { merge: true }).catch(e => console.warn('No se guardó la ficha de la cuenta en el panel', e));
+        return { codigo: v.codigo, tipo: v.tipo, vence: v.vence, correo, cuenta: uid, clientId, activada: Date.now() };
       } finally {
         app.auth().signOut().catch(() => { });
         app.delete().catch(() => { });
