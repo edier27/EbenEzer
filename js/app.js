@@ -79,6 +79,7 @@
           await T.auth.iniciar(u.id, v.pin);
           await T.registrar('tienda.crear', v.negocio);
           this.armar();
+          T.ui.conectarNube({ primera: true });
         } catch (e) { T.toast(e.message, 'error'); }
       };
       // Equipo nuevo (celular, otro computador): trae usuarios, inventario y ventas de la cuenta de la nube.
@@ -147,7 +148,10 @@
       T.$('#salir').onclick = T.$('#salir-movil').onclick = async e => { e.preventDefault(); await T.auth.salir(); this.login(); };
       T.$('#abrir-menu').onclick = () => T.$('#app').classList.toggle('menu-abierto');
       T.$('#app').addEventListener('click', e => { if (e.target.id === 'app' || e.target.closest('#nav a')) T.$('#app').classList.remove('menu-abierto'); });
-      T.$('#est-sync').onclick = () => { location.hash = '#config'; T.vistas.config.pestana = 'copias'; this.navegar(); };
+      T.$('#est-sync').onclick = () => {
+        if (!T.sync.nube && T.auth.puede('respaldo.gestionar')) return T.ui.conectarNube();
+        location.hash = '#config'; T.vistas.config.pestana = 'copias'; this.navegar();
+      };
       this.pintarSync();
       this.pintarBarra();
       this.navegar();
@@ -162,16 +166,21 @@
       reloj.textContent = new Date().toLocaleDateString('es-CO', { weekday: 'short', day: 'numeric', month: 'short' }) + ' · ' + T.hora(Date.now());
     },
 
+    // La nube (Firebase) es donde deben quedar todos los datos: si no está conectada, se ve en rojo.
     async pintarSync() {
       const el = T.$('#est-sync');
       if (!el) return;
       const pend = await T.sync.pendientes(), s = T.sync;
-      let cls = '', txt = 'Solo en este equipo';
-      if (s.hub || s.nube) {
-        cls = s.estado === 'error' ? 'error' : s.estado === 'sinred' ? 'sinred' : pend ? 'sinred' : 'ok';
-        txt = s.estado === 'error' ? 'Error al copiar' : s.estado === 'sinred' ? `Sin conexión · ${pend} pendientes` : pend ? `Copiando ${pend}…` : `Copiado (${[s.hub && 'tienda', s.nube && 'nube'].filter(Boolean).join(' + ')})`;
-      }
-      el.innerHTML = `<i class="punto ${cls}"></i><span>${txt}</span>`;
+      let cls, txt;
+      if (!s.nube && !s.nubeRevisada) { cls = 'sinred'; txt = 'Conectando con la nube…'; }
+      else if (!s.nube) { cls = 'error'; txt = s.hub ? 'Sin nube · solo en la tienda' : 'Sin nube · solo en este equipo'; }
+      else if (s.estado === 'error') { cls = 'error'; txt = 'Error al guardar en la nube'; }
+      else if (s.estado === 'sinred' || !navigator.onLine) { cls = 'sinred'; txt = `Sin internet · ${pend} por subir`; }
+      else if (pend) { cls = 'sinred'; txt = `Guardando ${pend} en la nube…`; }
+      else { cls = 'ok'; txt = 'Guardado en la nube'; }
+      el.classList.toggle('alerta', !s.nube && s.nubeRevisada);
+      el.title = s.nube ? `Cuenta de la nube: ${s.nube}${s.ultimaNube ? ' · última copia ' + T.hora(s.ultimaNube) : ''}` : 'Los datos no se están guardando en Firebase. Toque para conectar.';
+      el.innerHTML = `${T.ico(s.nube ? 'nube' : 'alerta')}<span>${txt}</span>`;
     },
 
     async navegar() {
@@ -217,10 +226,17 @@
   };
 
   window.addEventListener('hashchange', () => T.app.navegar());
-  T.on('sync', () => T.app.pintarSync());
+  // Cuando la nube se conecta o se desconecta, el aviso de Inicio se actualiza solo.
+  let nubeAntes = null;
+  T.on('sync', () => {
+    T.app.pintarSync();
+    const ahora = T.sync.nubeRevisada ? !!T.sync.nube : null;
+    if (ahora !== nubeAntes) { nubeAntes = ahora; if (T.app.actual === 'inicio' && !T.$('.modal-fondo')) T.app.refrescar(); }
+  });
   T.on('datos', tablas => { if (tablas.includes('cajas')) T.app.pintarBarra(); });
   setInterval(() => T.app.pintarBarra(), 20000);
   T.on('pendiente', T.debounce(() => T.app.pintarSync(), 400));
+  ['online', 'offline'].forEach(ev => window.addEventListener(ev, () => T.app.pintarSync()));
 
   // Cierre de sesión por inactividad (regla "bloqueoMin").
   let ultimoUso = Date.now();
@@ -243,7 +259,8 @@
       el.innerHTML = `
         <div class="cabeza"><div><h2>Resumen del día</h2><span class="suave">${new Date().toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</span></div>
           <div class="fila">${T.auth.puede('ventas.crear') ? `<a class="btn pri" href="#vender">${T.ico('vender')} Vender</a>` : ''}${T.auth.puede('compras.crear') && T.auth.puede('ia.usar') ? `<button class="btn ia" id="factura">${T.ico('factura')} Factura con IA</button>` : ''}${T.auth.puede('inventario.editar') && T.auth.puede('ia.usar') ? `<button class="btn" id="foto">${T.ico('camara')} Foto al inventario</button>` : ''}</div></div>
-        ${!T.sync.hub && !T.db.loc('nubeUid') && (sinResp === null || sinResp >= 1) ? `<div class="banda aviso">${T.ico('alerta')}<span>${sinResp === null ? 'Aún no hay ninguna copia de seguridad.' : `Hace ${sinResp} día(s) no se hace copia de seguridad.`} Los datos solo están en este navegador.</span>${T.auth.puede('respaldo.gestionar') ? '<button class="btn" id="resp">Descargar copia</button>' : ''}</div>` : ''}
+        ${location.protocol === 'file:' ? `<div class="banda peligro">${T.ico('alerta')}<span>Abrió el programa como archivo (${T.esc(decodeURIComponent(location.pathname).replace(/^\//, ''))}). Así los datos quedan aparte, solo en esta ventana. Ábralo con <b>Iniciar Tienda.bat</b> o en <b>ebenezer-fiados.web.app</b>.</span></div>` : ''}
+        ${T.sync.nubeRevisada && !T.sync.nube ? `<div class="banda peligro">${T.ico('nube')}<span>${T.sync.nubePerdida ? 'Se cerró la sesión de la nube en este equipo.' : 'Los datos NO se están guardando en Firebase.'} Si se daña el equipo o se borra el navegador, se pierden. ${T.auth.puede('respaldo.gestionar') ? '' : 'Pídale al administrador que conecte la nube.'}</span>${T.auth.puede('respaldo.gestionar') ? '<button class="btn pri" id="nube">Conectar la nube</button>' : ''}</div>` : ''}
         ${!caja && T.auth.puede('caja.operar') ? `<div class="banda">${T.ico('caja')}<span>La caja está cerrada.</span><a class="btn" href="#caja">Abrir caja</a></div>` : ''}
         ${verPlata ? `<div class="rejilla">
           <div class="tarjeta kpi principal"><h4>Ventas de hoy</h4><b>${T.money(d.recibido)}</b><small>${cambio === null ? '' : `<span class="delta ${cambio < 0 ? 'baja' : ''}">${cambio > 0 ? '+' : ''}${cambio}% vs. ayer</span>`}Contado ${T.money(d.contado)} + abonos ${T.money(d.abonos)}</small></div>
@@ -264,9 +281,38 @@
       if (foto) foto.onclick = () => T.ui.fotoIA('productos');
       if (fac) fac.onclick = () => T.ui.facturaIA();
       if (resp) resp.onclick = async () => { await T.respaldo.descargar(); T.app.refrescar(); };
+      const nube = T.$('#nube', el);
+      if (nube) nube.onclick = () => T.ui.conectarNube();
     }
   };
 
   T.ui = T.ui || {};
+
+  // ── Conectar este equipo a la nube (Firebase) ──
+  // Todos los equipos de la tienda entran con el MISMO correo y clave: así comparten los datos.
+  T.ui.conectarNube = ({ primera = false } = {}) => new Promise(res => {
+    if (T.sync.nube) return res(true);
+    const ir = crear => async cu => {
+      const correo = T.$('#nc-correo', cu).value.trim(), clave = T.$('#nc-clave', cu).value;
+      if (!/^\S+@\S+\.\S+$/.test(correo)) throw new Error('Escriba un correo válido');
+      if (clave.length < 6) throw new Error('La clave de la nube debe tener mínimo 6 caracteres');
+      T.$('#nc-estado', cu).innerHTML = '<div class="pensando">Conectando con Firebase…</div>';
+      try { await T.sync.entrarNube(correo, clave, crear); }
+      catch (e) { T.$('#nc-estado', cu).innerHTML = ''; throw e; }
+      T.toast(crear ? 'Cuenta creada: los datos ya se están guardando en la nube' : 'Nube conectada: los datos ya se están guardando en Firebase', 'ok');
+      T.app.pintarSync(); if (T.app.actual === 'inicio') T.app.refrescar();
+      return true;
+    };
+    T.modal({
+      titulo: primera ? 'Guardar la tienda en la nube' : 'Conectar la nube', ancho: 460, alCerrar: v => res(!!v),
+      cuerpo: `<div class="nube-intro">${T.ico('nube')}<p>Todas las ventas, fiados, abonos, inventario, caja, compras y usuarios se guardan en <b>Firebase</b>. Si se daña o se pierde el equipo, nada se pierde, y los demás equipos ven lo mismo.</p></div>
+        <div class="form" style="margin-top:14px"><label class="campo"><span>Correo de la tienda</span><input id="nc-correo" type="email" autocomplete="username" placeholder="correo@gmail.com"></label>
+          <label class="campo"><span>Clave de la nube (mínimo 6)</span><input id="nc-clave" type="password" autocomplete="current-password"></label></div>
+        <p class="suave" style="margin-top:10px;font-size:.86rem">Use <b>el mismo correo y clave en todos los equipos</b> de la tienda. Si ya conectó la nube en otro equipo o en ebenezer-fiados.web.app, toque <b>Entrar</b>. Si es la primera vez, <b>Crear cuenta</b>.</p>
+        <div id="nc-estado"></div>`,
+      botones: [{ txt: primera ? 'Después' : 'Cancelar', cls: 'sec' }, { txt: 'Crear cuenta', cls: 'sec', fn: ir(true) }, { txt: `${T.ico('nube')} Entrar`, cls: 'pri', fn: ir(false) }]
+    });
+  });
+
   document.addEventListener('DOMContentLoaded', () => T.app.iniciar());
 })(window.T);

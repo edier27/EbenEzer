@@ -115,8 +115,9 @@ y `.firebaserc`. No use el proyecto de ACCE PRO (`globalacce-37997`): publicar e
 `firestore.rules` hace cumplir en la nube que solo la cuenta dueña lea sus datos, que nada se borre
 y que bitácora, kárdex, abonos y movimientos de caja no se puedan modificar.
 
-> La sincronización con Firebase está programada pero **no se ha probado contra un proyecto real**
-> (hace falta crear el proyecto). Pruébela con datos de ensayo antes de confiar en ella.
+Mientras un equipo no tenga la nube conectada, la barra de arriba dice **"Sin nube"** en rojo e Inicio muestra
+un aviso con el botón **Conectar la nube**. Al crear una tienda nueva se pide conectarla de una vez.
+Todos los equipos deben entrar con **el mismo correo y clave**.
 
 ---
 

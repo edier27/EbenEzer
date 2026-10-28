@@ -84,8 +84,8 @@
         <div class="tarjeta"><h4>2 · Servidor de la tienda <span class="etq ${T.sync.hub ? 'ok' : ''}">${T.sync.hub ? 'Conectado' : 'No detectado'}</span></h4>
           ${T.sync.hub ? `<p class="texto">Cada cambio se copia al computador principal (carpeta <b>datos</b>) y se une con los demás equipos del WiFi. Pendientes por copiar: <b>${pend}</b>.${T.sync.claveHub ? `\nClave para conectar celulares y otros equipos: <b>${T.esc(T.sync.claveHub)}</b>` : ''}\nRespaldos completos guardados en la carpeta <b>respaldos</b>: <b>${archivos.length}</b>${archivos[0] ? `\nÚltimo: ${T.esc(archivos[0])}` : ''}</p><button class="btn" id="resp-srv">Hacer respaldo ahora</button>`
           : '<p class="texto">Abra la tienda con el archivo <b>Iniciar Tienda.bat</b> en el computador principal. Así los datos quedan también en el disco, se respaldan solos y los celulares del mismo WiFi comparten el mismo inventario.</p>'}</div>
-        <div class="tarjeta"><h4>3 · Nube (Firebase) <span class="etq ${T.sync.nube ? 'ok' : ''}">${T.sync.nube ? 'Conectada' : 'Sin conectar'}</span></h4>
-          ${T.sync.nube ? `<p class="texto">Cuenta: <b>${T.esc(T.sync.nube)}</b>. Los datos se copian a internet y llegan a cualquier equipo que entre con esta misma cuenta.</p><button class="btn" id="salir-nube">Desconectar</button>`
+        <div class="tarjeta"><h4>3 · Nube (Firebase) <span class="etq ${T.sync.nube ? 'ok' : 'mal'}">${T.sync.nube ? 'Conectada' : 'Sin conectar'}</span></h4>
+          ${T.sync.nube ? `<p class="texto">Cuenta: <b>${T.esc(T.sync.nube)}</b>. Todo se guarda en Firebase y llega a cualquier equipo que entre con esta misma cuenta.\nPendientes por subir: <b>${pend}</b>${T.sync.ultimaNube ? ` · última copia: <b>${T.hora(T.sync.ultimaNube)}</b>` : ''}.</p><button class="btn" id="salir-nube">Desconectar</button>`
           : `<p class="texto">Copia en internet (por si se daña o roban el computador) y acceso desde cualquier equipo. La primera vez toque <b>Crear cuenta</b>; en los demás equipos, <b>Entrar</b> con ese mismo correo y clave.</p>
               <div class="form"><label class="campo medio"><span>Correo</span><input id="correo" type="email" autocomplete="username"></label><label class="campo medio"><span>Clave (mínimo 6)</span><input id="clave-n" type="password" autocomplete="current-password"></label></div>
               <div class="fila" style="margin-top:12px"><button class="btn pri" id="crear-nube">Crear cuenta</button><button class="btn" id="entrar-nube">Entrar</button></div>
@@ -110,7 +110,10 @@
       });
       en('#entrar-nube', async () => { await T.sync.entrarNube(T.$('#correo', el).value.trim(), T.$('#clave-n', el).value, false); T.toast('Nube conectada', 'ok'); pintar(el); });
       en('#crear-nube', async () => { await T.sync.entrarNube(T.$('#correo', el).value.trim(), T.$('#clave-n', el).value, true); T.toast('Cuenta creada y conectada', 'ok'); pintar(el); });
-      en('#salir-nube', async () => { await T.sync.salirNube(); pintar(el); });
+      en('#salir-nube', async () => {
+        if (!await T.confirmar('Si desconecta la nube, lo que se haga en este equipo deja de guardarse en Firebase.', { titulo: 'Desconectar la nube', ok: 'Desconectar', peligro: true })) return;
+        await T.sync.salirNube(); pintar(el);
+      });
       en('#g-prefijo', async () => {
         const l = T.$('#prefijo', el).value.trim().toUpperCase().replace(/[^A-Z0-9]/g, ''), eq = T.db.cfg('equipos', {}), yo = T.db.loc('dispositivo');
         if (!l) throw new Error('Escriba una letra o número');

@@ -15,7 +15,7 @@
 // ════════════════════════════════════════════════════════════════════
 (function (T) {
   const D = () => T.db;
-  let ocupado = false, hub = false, fb = null, fbUsuario = null, fbEscucha = null;
+  let ocupado = false, hub = false, fb = null, fbUsuario = null, fbEscucha = null, ultNube = 0, fbListo = false;
 
   function estado(e, detalle) { T.sync.estado = e; T.sync.detalle = detalle || ''; T.emit('sync', e); }
 
@@ -115,7 +115,7 @@
     if (!window.firebase) for (const m of ['app', 'auth', 'firestore']) await cargar(`https://www.gstatic.com/firebasejs/${FB_VER}/firebase-${m}-compat.js`);
     fb = firebase.apps.length ? firebase.app() : firebase.initializeApp(cfgNube());
     fb.auth().onAuthStateChanged(async u => {
-      fbUsuario = u;
+      fbUsuario = u; fbListo = true;
       if (fbEscucha) { fbEscucha(); fbEscucha = null; }
       if (!u) return T.emit('sync');
       if (D().loc('nubeUid') !== u.uid) { await D().setLoc('nubeUid', u.uid); await D().setLoc('nubeCursor', null); await D().encolarTodo(); }
@@ -138,6 +138,7 @@
       try {
         if (cambios.length) await aplicar(cambios, 'n');
         if (ult) await D().setLoc('nubeCursor', { s: ult.seconds, n: ult.nanoseconds });
+        if (!snap.metadata.fromCache) ultNube = Date.now();
       } catch (e) { console.error(e); estado('error', e.message); }
     }, e => estado('error', e.message));
   }
@@ -150,6 +151,7 @@
       await lote.commit();
       await D().quitarPendientes(pend, 'n');
     }
+    ultNube = Date.now();
   }
 
   T.sync = {
@@ -157,12 +159,17 @@
     get hub() { return hub; },
     get nube() { return fbUsuario ? fbUsuario.email : null; },
     get proyectoNube() { return cfgNube().projectId; },
+    get ultimaNube() { return ultNube; },
+    // Ya se sabe si este equipo tiene la sesión de la nube abierta (Firebase tarda un momento en cargar).
+    get nubeRevisada() { return fbListo; },
+    // Equipo que ya estuvo conectado a la nube pero ahora no tiene la sesión abierta.
+    get nubePerdida() { return !fbUsuario && !!D().loc('nubeUid'); },
 
     async iniciar() {
       hub = await hubDetectar();
       if (hub) { try { await hubCiclo(); estado('ok'); } catch (e) { estado('error', e.message); } }
       // Sin internet Firebase no carga: no es un error si este equipo aún no usa la nube; se reintenta al volver la red.
-      const nube = () => fbIniciar().catch(e => { if (D().loc('nubeUid')) estado('sinred', e.message); });
+      const nube = () => fbIniciar().catch(e => { fbListo = true; if (D().loc('nubeUid')) estado('sinred', e.message); else T.emit('sync'); });
       nube();
       const lanzar = T.debounce(() => this.ahora(), 1500);
       T.on('pendiente', lanzar);
